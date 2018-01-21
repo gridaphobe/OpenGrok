@@ -20,7 +20,7 @@ CDDL HEADER END
 
 Copyright (c) 2005, 2017, Oracle and/or its affiliates. All rights reserved.
 Portions Copyright 2011 Jens Elkner.
-Portions Copyright (c) 2017, Chris Fraire <cfraire@me.com>.
+Portions Copyright (c) 2017-2018, Chris Fraire <cfraire@me.com>.
 
 --%>
 <%@page errorPage="error.jsp" import="
@@ -36,6 +36,7 @@ java.nio.charset.StandardCharsets,
 java.util.ArrayList,
 java.util.Arrays,
 java.util.List,
+java.util.Locale,
 java.util.Set,
 java.util.logging.Level,
 java.util.zip.GZIPInputStream,
@@ -149,7 +150,7 @@ document.pageReady.push(function() { pageReadyList();});
                 }
 %>
 <%
-    String lcName = readMes.get(i).toLowerCase();
+    String lcName = readMes.get(i).toLowerCase(Locale.ROOT);
     if (lcName.endsWith(".md") || lcName.endsWith(".markdown")) {
     %><div id="src<%=i%>" data-markdown>
         <div class="markdown-heading">

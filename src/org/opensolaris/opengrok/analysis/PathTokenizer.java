@@ -19,11 +19,13 @@
 
 /*
  * Copyright (c) 2005, 2015, Oracle and/or its affiliates. All rights reserved.
+ * Portions Copyright (c) 2018, Chris Fraire <cfraire@me.com>.
  */
 package org.opensolaris.opengrok.analysis;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Locale;
 import org.apache.lucene.analysis.Tokenizer;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 import org.apache.lucene.analysis.tokenattributes.OffsetAttribute;
@@ -87,10 +89,22 @@ public class PathTokenizer extends Tokenizer {
         } while (c == delimiter);
 
         do {
-            if (i >= buf.length) {
+            // Allow for 1:M character mappings as quoted below.
+            if (i + 3 >= buf.length) {
                 buf = Arrays.copyOf(buf, buf.length * 2);
             }
-            buf[i++] = Character.toLowerCase((char) c);
+            /**
+             * "In general, String.toLowerCase(Locale) should be used to map
+             * characters to lowercase. String case mapping methods have several
+             * benefits over Character case mapping methods. String case mapping
+             * methods can perform locale-sensitive mappings, context-sensitive
+             * mappings, and 1:M character mappings, whereas the Character case
+             * mapping methods cannot."
+             */
+            String clower = String.valueOf((char)c).toLowerCase(Locale.ROOT);
+            for (int j = 0; j < clower.length(); ++j) {
+                buf[i++] = clower.charAt(j);
+            }
             c = input.read();
             charsRead++;
         } while (c != delimiter && c != cdot && !Character.isWhitespace(c) && c != -1);
