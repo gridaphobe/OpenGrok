@@ -69,7 +69,7 @@ public class SearchAndContextFormatterTest {
         env = RuntimeEnvironment.getInstance();
         env.setAllNonWhitespace(true);
 
-        repository = new TestRepository();
+        repository = new TestRepository(env);
         repository.create(HistoryGuru.class.getResourceAsStream(
             "repositories.zip"));
 
@@ -87,7 +87,7 @@ public class SearchAndContextFormatterTest {
             Indexer.getInstance().prepareIndexer(env, true, true,
                 new TreeSet<>(Arrays.asList(new String[]{"/c"})),
                 false, false, null, null, new ArrayList<>(), false);
-            Indexer.getInstance().doIndexerExecution(true, null, null);
+            Indexer.getInstance().doIndexerExecution(env, true, null, null);
         } else {
             System.out.println(
                 "Skipping test. Could not find a ctags I could use in path.");
@@ -96,8 +96,7 @@ public class SearchAndContextFormatterTest {
 
         configFile = File.createTempFile("configuration", ".xml");
         env.writeConfiguration(configFile);
-        RuntimeEnvironment.getInstance().readConfiguration(new File(
-            configFile.getAbsolutePath()));
+        env.readConfiguration(new File(configFile.getAbsolutePath()));
     }
 
     @AfterClass
@@ -125,7 +124,7 @@ public class SearchAndContextFormatterTest {
         SearchEngine instance;
         int noHits;
 
-        instance = new SearchEngine();
+        instance = new SearchEngine(env);
         instance.setFreetext("embedded");
         instance.setFile("main.c");
         noHits = instance.search();
@@ -153,7 +152,7 @@ public class SearchAndContextFormatterTest {
         SearchEngine instance;
         int noHits;
 
-        instance = new SearchEngine();
+        instance = new SearchEngine(env);
         instance.setFreetext("<example.cpp>");
         instance.setFile("main.c");
         noHits = instance.search();
@@ -178,8 +177,7 @@ public class SearchAndContextFormatterTest {
          * The following `anz' should go unused, but UnifiedHighlighter demands
          * an analyzer "even if in some circumstances it isn't used."
          */
-        PlainAnalyzerFactory fac = PlainAnalyzerFactory.DEFAULT_INSTANCE;
-        FileAnalyzer anz = fac.getAnalyzer();
+        FileAnalyzer anz = env.getAnalyzerGuru().getPlainAnalyzer();
 
         ContextFormatter formatter = new ContextFormatter(args);
         OGKUnifiedHighlighter uhi = new OGKUnifiedHighlighter(env,

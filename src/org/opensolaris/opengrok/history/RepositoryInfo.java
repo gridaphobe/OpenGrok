@@ -19,7 +19,7 @@
 
 /*
  * Copyright (c) 2008, 2017, Oracle and/or its affiliates. All rights reserved.
- * Portions Copyright (c) 2017, Chris Fraire <cfraire@me.com>.
+ * Portions Copyright (c) 2017-2018, Chris Fraire <cfraire@me.com>.
  */
 package org.opensolaris.opengrok.history;
 
@@ -52,6 +52,15 @@ public class RepositoryInfo implements Serializable {
     }
 
     private static final long serialVersionUID = 3L;
+
+    /**
+     * This will be a tough one to unwind, since the class is serialized, but
+     * also needs to access runtime information. The data and actor parts of
+     * this class would probably have to be separated to get rid of the
+     * following static dependency.
+     */
+    protected transient final RuntimeEnvironment env =
+        RuntimeEnvironment.getInstance();
 
     // dummy to avoid storing absolute path in XML encoded configuration
     // Do not use this member.
@@ -110,8 +119,7 @@ public class RepositoryInfo implements Serializable {
      * @return the name of the root directory
      */
     public String getDirectoryName() {
-        return RuntimeEnvironment.getInstance().getSourceRootPath() +
-                directoryNameRelative;
+        return env.getSourceRootPath() + directoryNameRelative;
     }
 
     /**
@@ -121,7 +129,6 @@ public class RepositoryInfo implements Serializable {
      * path or relative to source root.
      */
     public void setDirectoryName(File dir) {
-        RuntimeEnvironment env = RuntimeEnvironment.getInstance();
         String rootPath = env.getSourceRootPath();
         String path;
         String originalPath = dir.getPath();

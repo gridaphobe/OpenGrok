@@ -56,6 +56,7 @@ import org.opensolaris.opengrok.util.TestRepository;
  */
 public class CAnalyzerFactoryTest {
 
+    private static RuntimeEnvironment env;
     private static Ctags ctags;
     private static TestRepository repository;
     private static FileAnalyzer analyzer;
@@ -71,18 +72,17 @@ public class CAnalyzerFactoryTest {
 
     @BeforeClass
     public static void setUpClass() throws Exception {
-        ctags = new Ctags();
-        ctags.setBinary(RuntimeEnvironment.getInstance().getCtags());
+        env = RuntimeEnvironment.getInstance();
+        ctags = new Ctags(env);
 
-        repository = new TestRepository();
+        repository = new TestRepository(env);
         repository.create(CAnalyzerFactoryTest.class.getResourceAsStream(
                 "/org/opensolaris/opengrok/index/source.zip"));
 
-        CAnalyzerFactory analFact = new CAnalyzerFactory();
+        CAnalyzerFactory analFact = new CAnalyzerFactory(env);
         analyzer = analFact.getAnalyzer();
-        RuntimeEnvironment env = RuntimeEnvironment.getInstance();
         if (env.validateExuberantCtags()) {
-            analyzer.setCtags(new Ctags());
+            analyzer.setCtags(new Ctags(env));
         }
     }
 

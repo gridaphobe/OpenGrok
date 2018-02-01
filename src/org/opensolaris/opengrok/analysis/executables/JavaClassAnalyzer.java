@@ -64,7 +64,6 @@ import org.opensolaris.opengrok.analysis.IteratorReader;
 import org.opensolaris.opengrok.analysis.OGKTextField;
 import org.opensolaris.opengrok.analysis.OGKTextVecField;
 import org.opensolaris.opengrok.analysis.StreamSource;
-import org.opensolaris.opengrok.configuration.RuntimeEnvironment;
 import org.opensolaris.opengrok.logger.LoggerFactory;
 import org.opensolaris.opengrok.search.QueryBuilder;
 import org.opensolaris.opengrok.web.Util;
@@ -79,7 +78,7 @@ public class JavaClassAnalyzer extends FileAnalyzer {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(JavaClassAnalyzer.class);
 
-    private final String urlPrefix = RuntimeEnvironment.getInstance().getUrlPrefix();
+    private final String urlPrefix;
 
     /**
      * Creates a new instance of JavaClassAnalyzer
@@ -88,6 +87,8 @@ public class JavaClassAnalyzer extends FileAnalyzer {
      */
     protected JavaClassAnalyzer(FileAnalyzerFactory factory) {
         super(factory);
+
+        urlPrefix = factory.getEnv().getUrlPrefix();
     }
 
     /**

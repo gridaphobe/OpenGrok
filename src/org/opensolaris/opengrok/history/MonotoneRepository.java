@@ -19,7 +19,7 @@
 
 /*
  * Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
- * Portions Copyright (c) 2017, Chris Fraire <cfraire@me.com>.
+ * Portions Copyright (c) 2017-2018, Chris Fraire <cfraire@me.com>.
  */
 package org.opensolaris.opengrok.history;
 
@@ -142,7 +142,8 @@ public class MonotoneRepository extends Repository {
         cmd.add("--no-format-dates");
         cmd.add(filename);
 
-        return new Executor(cmd, new File(getDirectoryName()), sinceRevision != null);
+        return new Executor(cmd, new File(getDirectoryName()),
+            sinceRevision != null ? env.getCommandTimeout() : 0);
     }
     /**
      * Pattern used to extract author/revision from hg annotate.
@@ -172,7 +173,8 @@ public class MonotoneRepository extends Repository {
         cmd.add(file.getName());
         File directory = new File(getDirectoryName());
 
-        Executor executor = new Executor(cmd, directory);
+        Executor executor = new Executor(cmd, directory,
+            env.getCommandTimeout());
         if (executor.exec() != 0) {
             throw new IOException(executor.getErrorString());
         }
@@ -211,7 +213,8 @@ public class MonotoneRepository extends Repository {
         cmd.add(RepoCommand);
         cmd.add("pull");
         cmd.add(getQuietOption());
-        Executor executor = new Executor(cmd, directory);
+        Executor executor = new Executor(cmd, directory,
+            env.getCommandTimeout());
         if (executor.exec() != 0) {
             throw new IOException(executor.getErrorString());
         }
@@ -220,7 +223,7 @@ public class MonotoneRepository extends Repository {
         cmd.add(RepoCommand);
         cmd.add("update");
         cmd.add(getQuietOption());
-        executor = new Executor(cmd, directory);
+        executor = new Executor(cmd, directory, env.getCommandTimeout());
         if (executor.exec() != 0) {
             throw new IOException(executor.getErrorString());
         }
@@ -259,7 +262,7 @@ public class MonotoneRepository extends Repository {
     @Override
     History getHistory(File file, String sinceRevision)
             throws HistoryException {
-        return new MonotoneHistoryParser(this).parse(file, sinceRevision);
+        return new MonotoneHistoryParser(this, env).parse(file, sinceRevision);
     }
 
     private String getQuietOption() {

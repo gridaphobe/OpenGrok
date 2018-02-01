@@ -19,6 +19,7 @@
 
 /*
  * Copyright (c) 2008, 2017, Oracle and/or its affiliates. All rights reserved.
+ * Portions Copyright (c) 2018, Chris Fraire <cfraire@me.com>.
  */
 package org.opensolaris.opengrok.history;
 
@@ -52,7 +53,8 @@ import org.opensolaris.opengrok.util.TestRepository;
  */
 public class HistoryGuruTest {
 
-    private static TestRepository repository = new TestRepository();
+    private static RuntimeEnvironment env;
+    private static TestRepository repository;
     private static final List<File> FILES = new ArrayList<>();
 
     public HistoryGuruTest() {
@@ -60,9 +62,9 @@ public class HistoryGuruTest {
 
     @BeforeClass
     public static void setUpClass() throws Exception {
-        RuntimeEnvironment env = RuntimeEnvironment.getInstance();
+        env = RuntimeEnvironment.getInstance();
         
-        repository = new TestRepository();
+        repository = new TestRepository(env);
         repository.create(HistoryGuru.class.getResourceAsStream(
                 "repositories.zip"));
         RepositoryFactory.initializeIgnoredNames(env);
@@ -72,7 +74,7 @@ public class HistoryGuruTest {
         
         env.setVerbose(true);
 
-        HistoryGuru histGuru = HistoryGuru.getInstance();
+        HistoryGuru histGuru = env.getHistoryGuru();
         assertNotNull(histGuru);
         Assert.assertEquals(0, histGuru.getRepositories().size());
         
@@ -104,13 +106,13 @@ public class HistoryGuruTest {
 
     @Test
     public void testUpdateRepositories() {
-        HistoryGuru instance = HistoryGuru.getInstance();
+        HistoryGuru instance = env.getHistoryGuru();
         instance.updateRepositories();
     }
 
     @Test
     public void testGetRevision() throws HistoryException, IOException {
-        HistoryGuru instance = HistoryGuru.getInstance();
+        HistoryGuru instance = env.getHistoryGuru();
 
         for (File f : FILES) {
             if (f.isFile() && instance.hasHistory(f)) {
@@ -129,7 +131,7 @@ public class HistoryGuruTest {
 
     @Test
     public void testBug16465() throws HistoryException, IOException {
-        HistoryGuru instance = HistoryGuru.getInstance();
+        HistoryGuru instance = env.getHistoryGuru();
         for (File f : FILES) {
             if (f.getName().equals("bugreport16465@")) {
                 assertNotNull(instance.getHistory(f));
@@ -140,7 +142,7 @@ public class HistoryGuruTest {
 
     @Test
     public void annotation() throws Exception {
-        HistoryGuru instance = HistoryGuru.getInstance();
+        HistoryGuru instance = env.getHistoryGuru();
         for (File f : FILES) {
             if (instance.hasAnnotation(f)) {
                 instance.annotate(f, null);
@@ -151,15 +153,13 @@ public class HistoryGuruTest {
     @Test
     public void getCacheInfo() throws HistoryException {
         // FileHistoryCache is used by default
-        assertEquals("FileHistoryCache",
-                HistoryGuru.getInstance().getCacheInfo());
+        assertEquals("FileHistoryCache", env.getHistoryGuru().getCacheInfo());
     }
     
     @Test
     @ConditionalRun(condition = RepositoryInstalled.GitInstalled.class)
     public void testAddRemoveRepositories() {
-        HistoryGuru instance = HistoryGuru.getInstance();
-        RuntimeEnvironment env = RuntimeEnvironment.getInstance();
+        HistoryGuru instance = env.getHistoryGuru();
         final int numReposOrig = instance.getRepositories().size();
         
         // Try to add non-existent repository.

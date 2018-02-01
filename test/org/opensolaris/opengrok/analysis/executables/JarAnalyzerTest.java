@@ -65,7 +65,7 @@ public class JarAnalyzerTest {
         originalProjectsEnabled = env.isProjectsEnabled();
         env.setProjectsEnabled(false);
 
-        repository = new TestRepository();
+        repository = new TestRepository(env);
         repository.createEmpty();
         repository.addAdhocFile(TESTPLUGINS_JAR,
             AuthorizationFrameworkReloadTest.class.getResourceAsStream(
@@ -83,7 +83,7 @@ public class JarAnalyzerTest {
                 new TreeSet<>(Arrays.asList(new String[]{"/c"})),
                 false, false, null, null, new ArrayList<>(), false);
 
-            Indexer.getInstance().doIndexerExecution(true, null, progress);
+            Indexer.getInstance().doIndexerExecution(env, true, null, progress);
         } else {
             System.out.println(
                 "Skipping test. Could not find a ctags I could use in path.");
@@ -110,7 +110,7 @@ public class JarAnalyzerTest {
         SearchEngine instance;
         int noHits;
 
-        instance = new SearchEngine();
+        instance = new SearchEngine(env);
         instance.setFile(TESTPLUGINS_JAR);
         noHits = instance.search();
         assertTrue("noHits for " + TESTPLUGINS_JAR + " should be positive",

@@ -72,33 +72,27 @@ import static org.junit.Assert.assertTrue;
  */
 public class IndexerTest {
 
+    private static RuntimeEnvironment env;
     TestRepository repository;
-    private static IndexerParallelizer parallelizer;
 
     @Rule
     public ConditionalRunRule rule = new ConditionalRunRule();
 
     @BeforeClass
     public static void setUpClass() throws Exception {
-        RuntimeEnvironment env = RuntimeEnvironment.getInstance();
+        env = RuntimeEnvironment.getInstance();
         assertTrue("No point in running indexer tests without valid ctags",
             env.validateExuberantCtags());
         RepositoryFactory.initializeIgnoredNames(env);
-
-        parallelizer = new IndexerParallelizer(env);
     }
 
     @AfterClass
     public static void tearDownClass() throws Exception {
-        if (parallelizer != null) {
-            parallelizer.close();
-            parallelizer = null;
-        }
     }
 
     @Before
     public void setUp() throws IOException {
-        repository = new TestRepository();
+        repository = new TestRepository(env);
         repository.create(IndexerTest.class.getResourceAsStream("source.zip"));
     }
 
@@ -114,7 +108,6 @@ public class IndexerTest {
     @Test
     public void testIndexGeneration() throws Exception {
         System.out.println("Generating index by using the class methods");
-        RuntimeEnvironment env = RuntimeEnvironment.getInstance();
         if (env.validateExuberantCtags()) {
             env.setSourceRoot(repository.getSourceRoot());
             env.setDataRoot(repository.getDataRoot());
@@ -122,7 +115,7 @@ public class IndexerTest {
             env.setHistoryEnabled(false);
             Indexer.getInstance().prepareIndexer(env, true, true, new TreeSet<>(Arrays.asList(new String[]{"/c"})),
                     false, false, null, null, new ArrayList<>(), false);
-            Indexer.getInstance().doIndexerExecution(true, null, null);
+            Indexer.getInstance().doIndexerExecution(env, true, null, null);
         } else {
             System.out.println("Skipping test. Could not find a ctags I could use in path.");
         }
@@ -147,7 +140,6 @@ public class IndexerTest {
         Map<String,Project> projects = new HashMap<>();
         projects.put(p1.getName(), p1);
         projects.put("nonexistent", p2);
-        RuntimeEnvironment env = RuntimeEnvironment.getInstance();        
         env.setProjects(projects);
         env.setHistoryEnabled(false);
 
@@ -196,7 +188,6 @@ public class IndexerTest {
     @Test
     public void testMain() throws IOException {
         System.out.println("Generate index by using command line options");
-        RuntimeEnvironment env = RuntimeEnvironment.getInstance();
         if (env.validateExuberantCtags()) {
             String[] argv = {"-S", "-P", "-H", "-Q", "off", "-s",
                 repository.getSourceRoot(), "-d", repository.getDataRoot(),
@@ -247,7 +238,6 @@ public class IndexerTest {
      */
     @Test
     public void testIndexWithSetIndexVersionedFilesOnly() throws Exception {
-        RuntimeEnvironment env = RuntimeEnvironment.getInstance();
         env.setSourceRoot(repository.getSourceRoot());
         env.setDataRoot(repository.getDataRoot());
         env.setRepositories(repository.getSourceRoot());
@@ -256,7 +246,7 @@ public class IndexerTest {
         Repository r = null;
         for (RepositoryInfo ri : repos) {
             if (ri.getDirectoryName().equals(repository.getSourceRoot() + "/rfe2575")) {
-                r = RepositoryFactory.getRepository(ri);
+                r = RepositoryFactory.getRepository(env, ri);
                 break;
             }
         }
@@ -264,20 +254,20 @@ public class IndexerTest {
         if (r != null && r.isWorking() && env.validateExuberantCtags()) {
             Project project = new Project("rfe2575");
             project.setPath("/rfe2575");
-            IndexDatabase idb = new IndexDatabase(project);
+            IndexDatabase idb = new IndexDatabase(env, project);
             assertNotNull(idb);
             MyIndexChangeListener listener = new MyIndexChangeListener();
             idb.addIndexChangedListener(listener);
-            idb.update(parallelizer);
+            idb.update();
             assertEquals(2, listener.files.size());
             repository.purgeData();
-            RuntimeEnvironment.getInstance().setIndexVersionedFilesOnly(true);
-            idb = new IndexDatabase(project);
+            env.setIndexVersionedFilesOnly(true);
+            idb = new IndexDatabase(env, project);
             listener = new MyIndexChangeListener();
             idb.addIndexChangedListener(listener);
-            idb.update(parallelizer);
+            idb.update();
             assertEquals(1, listener.files.size());
-            RuntimeEnvironment.getInstance().setIndexVersionedFilesOnly(false);
+            env.setIndexVersionedFilesOnly(false);
         } else {
             System.out.println("Skipping test. Repository for rfe2575 not found" +
                 " or could not find a ctags or an sccs I could use in path.");
@@ -315,7 +305,6 @@ public class IndexerTest {
             // since the call to {@code removeFile()} will be eventually
             // followed by {@code addFile()} that will create the file again.
             if (path.equals("/mercurial/bar.txt")) {
-                RuntimeEnvironment env = RuntimeEnvironment.getInstance();
                 File f = new File(env.getDataRootPath(), "historycache" + path + ".gz");
                 Assert.assertTrue("history cache file should be preserved", f.exists());
             }
@@ -336,13 +325,11 @@ public class IndexerTest {
     @Test
     @ConditionalRun(condition = RepositoryInstalled.MercurialInstalled.class)
     public void testRemoveFileOnFileChange() throws Exception {
-        RuntimeEnvironment env = RuntimeEnvironment.getInstance();
-
         if (!env.validateExuberantCtags()) {
             System.out.println("Skipping test due to no ctags");
         }
 
-        TestRepository testrepo = new TestRepository();
+        TestRepository testrepo = new TestRepository(env);
         testrepo.create(HistoryGuru.class.getResourceAsStream("repositories.zip"));
 
         env.setSourceRoot(testrepo.getSourceRoot());
@@ -351,11 +338,11 @@ public class IndexerTest {
 
         // create index
         Project project = new Project("mercurial", "/mercurial");
-        IndexDatabase idb = new IndexDatabase(project);
+        IndexDatabase idb = new IndexDatabase(env, project);
         assertNotNull(idb);
         RemoveIndexChangeListener listener = new RemoveIndexChangeListener();
         idb.addIndexChangedListener(listener);
-        idb.update(parallelizer);
+        idb.update();
         Assert.assertEquals(5, listener.filesToAdd.size());
         listener.reset();
 
@@ -371,7 +358,7 @@ public class IndexerTest {
         fw.close();
 
         // reindex
-        idb.update(parallelizer);
+        idb.update();
         // Make sure that the file was actually processed.
         assertEquals(1, listener.removedFiles.size());
         assertEquals(1, listener.filesToAdd.size());
@@ -384,14 +371,15 @@ public class IndexerTest {
     public void testXref() throws IOException {
         List<File> files = new ArrayList<>();
         FileUtilities.getAllFiles(new File(repository.getSourceRoot()), files, false);
+        AnalyzerGuru guru = env.getAnalyzerGuru();
         for (File f : files) {
-            FileAnalyzerFactory factory = AnalyzerGuru.find(f.getAbsolutePath());
+            FileAnalyzerFactory factory = guru.find(f.getAbsolutePath());
             if (factory == null) {
                 continue;
             }
             try (FileReader in = new FileReader(f); StringWriter out = new StringWriter()) {
                 try {
-                    AnalyzerGuru.writeXref(factory, in, out, null, null, null);
+                    guru.writeXref(factory, in, out, null, null, null);
                 } catch (UnsupportedOperationException exp) {
                     // ignore
                 }
@@ -401,18 +389,17 @@ public class IndexerTest {
 
     @Test
     public void testBug3430() throws Exception {
-        RuntimeEnvironment env = RuntimeEnvironment.getInstance();
         env.setSourceRoot(repository.getSourceRoot());
         env.setDataRoot(repository.getDataRoot());
 
         if (env.validateExuberantCtags()) {
             Project project = new Project("bug3430");
             project.setPath("/bug3430");
-            IndexDatabase idb = new IndexDatabase(project);
+            IndexDatabase idb = new IndexDatabase(env, project);
             assertNotNull(idb);
             MyIndexChangeListener listener = new MyIndexChangeListener();
             idb.addIndexChangedListener(listener);
-            idb.update(parallelizer);
+            idb.update();
             assertEquals(1, listener.files.size());
         } else {
             System.out.println("Skipping test. Could not find a ctags I could use in path.");
@@ -425,25 +412,24 @@ public class IndexerTest {
      */
     @Test
     public void testIncrementalIndexAddRemoveFile() throws Exception {
-        RuntimeEnvironment env = RuntimeEnvironment.getInstance();
         env.setSourceRoot(repository.getSourceRoot());
         env.setDataRoot(repository.getDataRoot());
 
         if (env.validateExuberantCtags()) {
             String ppath = "/bug3430";
             Project project = new Project("bug3430", ppath);
-            IndexDatabase idb = new IndexDatabase(project);
+            IndexDatabase idb = new IndexDatabase(env, project);
             assertNotNull(idb);
             MyIndexChangeListener listener = new MyIndexChangeListener();
             idb.addIndexChangedListener(listener);
-            idb.update(parallelizer);
+            idb.update();
             assertEquals(1, listener.files.size());
             listener.reset();
             repository.addDummyFile(ppath);
-            idb.update(parallelizer);
+            idb.update();
             assertEquals("No new file added", 1, listener.files.size());
             repository.removeDummyFile(ppath);
-            idb.update(parallelizer);
+            idb.update();
             assertEquals("(added)files changed unexpectedly", 1,
                 listener.files.size());
             assertEquals("Didn't remove the dummy file", 1, listener.removedFiles.size());
@@ -468,26 +454,29 @@ public class IndexerTest {
         }
 
         if (test) {
-            RuntimeEnvironment env = RuntimeEnvironment.getInstance();
             env.setSourceRoot(repository.getSourceRoot());
             env.setDataRoot(repository.getDataRoot());
             Executor executor;
 
-            executor = new Executor(new String[]{"mkdir", "-p", repository.getSourceRoot() + "/testBug11896"});
+            executor = new Executor(new String[]{"mkdir", "-p",
+                repository.getSourceRoot() + "/testBug11896"},
+                env.getCommandTimeout());
             executor.exec(true);
 
-            executor = new Executor(new String[]{"mkfifo", repository.getSourceRoot() + "/testBug11896/FIFO"});
+            executor = new Executor(new String[]{"mkfifo",
+                repository.getSourceRoot() + "/testBug11896/FIFO"},
+                env.getCommandTimeout());
             executor.exec(true);
 
             if (env.validateExuberantCtags()) {
                 Project project = new Project("testBug11896");
                 project.setPath("/testBug11896");
-                IndexDatabase idb = new IndexDatabase(project);
+                IndexDatabase idb = new IndexDatabase(env, project);
                 assertNotNull(idb);
                 MyIndexChangeListener listener = new MyIndexChangeListener();
                 idb.addIndexChangedListener(listener);
                 System.out.println("Trying to index a special file - FIFO in this case.");
-                idb.update(parallelizer);
+                idb.update();
                 assertEquals(0, listener.files.size());
             } else {
                 System.out.println("Skipping test. Could not find a ctags I could use in path.");
@@ -504,7 +493,6 @@ public class IndexerTest {
      */
     @Test
     public void testDefaultProjectsSingleProject() throws Exception {
-        RuntimeEnvironment env = RuntimeEnvironment.getInstance();
         env.setSourceRoot(repository.getSourceRoot());
         env.setDataRoot(repository.getDataRoot());
         env.setHistoryEnabled(false);
@@ -522,7 +510,6 @@ public class IndexerTest {
      */
     @Test
     public void testDefaultProjectsNonExistent() throws Exception {
-        RuntimeEnvironment env = RuntimeEnvironment.getInstance();
         env.setSourceRoot(repository.getSourceRoot());
         env.setDataRoot(repository.getDataRoot());
         env.setHistoryEnabled(false);
@@ -541,7 +528,6 @@ public class IndexerTest {
      */
     @Test
     public void testDefaultProjectsAll() throws Exception {
-        RuntimeEnvironment env = RuntimeEnvironment.getInstance();
         env.setSourceRoot(repository.getSourceRoot());
         env.setDataRoot(repository.getDataRoot());
         env.setHistoryEnabled(false);

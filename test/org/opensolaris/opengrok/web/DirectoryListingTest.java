@@ -19,7 +19,7 @@
 
 /*
  * Copyright (c) 2007, 2017, Oracle and/or its affiliates. All rights reserved.
- * Portions Copyright (c) 2017, Chris Fraire <cfraire@me.com>.
+ * Portions Copyright (c) 2017-2018, Chris Fraire <cfraire@me.com>.
  */
 package org.opensolaris.opengrok.web;
 
@@ -62,6 +62,7 @@ public class DirectoryListingTest {
      */
     private static final int INVALID_SIZE = -1;
 
+    private static RuntimeEnvironment env;
     private File directory;
     private FileEntry[] entries;
     private SimpleDateFormat dateFormatter;
@@ -178,6 +179,7 @@ public class DirectoryListingTest {
 
     @BeforeClass
     public static void setUpClass() throws Exception {
+        env = RuntimeEnvironment.getInstance();
     }
 
     @AfterClass
@@ -212,7 +214,6 @@ public class DirectoryListingTest {
         hgtags.create();
 
         // Need to populate list of ignored entries for all repository types.
-        RuntimeEnvironment env = RuntimeEnvironment.getInstance();
         RepositoryFactory.initializeIgnoredNames(env);
     }
 
@@ -369,7 +370,7 @@ public class DirectoryListingTest {
         StringWriter out = new StringWriter();
         out.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<start>\n");
 
-        DirectoryListing instance = new DirectoryListing();
+        DirectoryListing instance = new DirectoryListing(env);
         instance.listTo("ctx", directory, out, directory.getPath(),
                 Arrays.asList(directory.list()));
 

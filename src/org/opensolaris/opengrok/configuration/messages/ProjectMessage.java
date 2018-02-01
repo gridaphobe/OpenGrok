@@ -19,6 +19,7 @@
 
 /*
  * Copyright (c) 2017, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Portions Copyright (c) 2018, Chris Fraire <cfraire@me.com>.
  */
 package org.opensolaris.opengrok.configuration.messages;
 
@@ -93,7 +94,7 @@ public class ProjectMessage extends Message {
     private List<RepositoryInfo> getRepositoriesInDir(RuntimeEnvironment env,
             File projDir) {
 
-        HistoryGuru histGuru = HistoryGuru.getInstance();
+        HistoryGuru histGuru = env.getHistoryGuru();
 
         // There is no need to perform the work of invalidateRepositories(),
         // since addRepositories() calls getRepository() for each of
@@ -194,7 +195,7 @@ public class ProjectMessage extends Message {
                                 File.separator + dirName +
                                 File.separator + projectName));
                     }
-                    HistoryGuru guru = HistoryGuru.getInstance();
+                    HistoryGuru guru = env.getHistoryGuru();
                     guru.removeCache(repos.stream().
                         map((x) -> {
                             try {
@@ -226,7 +227,7 @@ public class ProjectMessage extends Message {
                         List<RepositoryInfo> riList = env.getProjectRepositoriesMap().get(project);
                         if (riList != null) {
                             for (RepositoryInfo ri : riList) {
-                                Repository repo = getRepository(ri);
+                                Repository repo = getRepository(env, ri);
 
                                 if (repo != null && repo.getCurrentVersion() != null &&
                                     repo.getCurrentVersion().length() > 0) {

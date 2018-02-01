@@ -122,12 +122,13 @@ public class AuthorizationStack extends AuthorizationEntity {
      * the authorization decision made by this stack.
      * </p>
      *
+     * @param env a defined instance
      * @param parameters parameters given in the configuration
      *
-     * @see IAuthorizationPlugin#load(java.util.Map)
+     * @see IAuthorizationPlugin#load(org.opensolaris.opengrok.configuration.RuntimeEnvironment, java.util.Map)
      */
     @Override
-    public void load(Map<String, Object> parameters) {
+    public void load(RuntimeEnvironment env, Map<String, Object> parameters) {
         setCurrentSetup(new TreeMap<>());
         getCurrentSetup().putAll(parameters);
         getCurrentSetup().putAll(getSetup());
@@ -137,13 +138,13 @@ public class AuthorizationStack extends AuthorizationEntity {
             getName()});
 
         // fill properly the "forGroups" and "forProjects" fields
-        processTargetGroupsAndProjects();
+        processTargetGroupsAndProjects(env);
 
         setWorking();
 
         int cnt = 0;
         for (AuthorizationEntity authEntity : getStack()) {
-            authEntity.load(getCurrentSetup());
+            authEntity.load(env, getCurrentSetup());
             if (authEntity.isWorking()) {
                 cnt++;
             }

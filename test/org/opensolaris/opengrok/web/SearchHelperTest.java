@@ -46,11 +46,12 @@ import org.opensolaris.opengrok.util.TestRepository;
  * Unit tests for the {@code SearchHelper} class.
  */
 public class SearchHelperTest {
+    private static RuntimeEnvironment env;
     TestRepository repository;
-    RuntimeEnvironment env;
     
     @BeforeClass
     public static void setUpClass() throws Exception {
+        env = RuntimeEnvironment.getInstance();
     }
 
     @AfterClass
@@ -59,10 +60,9 @@ public class SearchHelperTest {
 
     @Before
     public void setUp() throws IOException {
-        repository = new TestRepository();
+        repository = new TestRepository(env);
         repository.create(IndexerTest.class.getResourceAsStream("source.zip"));
 
-        env = RuntimeEnvironment.getInstance();
         env.setSourceRoot(repository.getSourceRoot());
         env.setDataRoot(repository.getDataRoot());
         env.setVerbose(true);
@@ -80,15 +80,15 @@ public class SearchHelperTest {
         Indexer.getInstance().prepareIndexer(env, true, true,
             new TreeSet<>(Arrays.asList(new String[]{"/c"})),
             false, false, null, null, new ArrayList<>(), false);
-        Indexer.getInstance().doIndexerExecution(true, null, null);
+        Indexer.getInstance().doIndexerExecution(env, true, null, null);
     }
 
     private SearchHelper getSearchHelper(String searchTerm) {
-        SearchHelper sh = new SearchHelper();
+        SearchHelper sh = new SearchHelper(env);
 
         sh.dataRoot = env.getDataRootFile(); // throws Exception if none-existent
         sh.order = SortOrder.RELEVANCY;
-        sh.builder = new QueryBuilder().setFreetext(searchTerm);
+        sh.builder = new QueryBuilder(env).setFreetext(searchTerm);
         Assert.assertNotSame(0, sh.builder.getSize());
         sh.start = 0;
         sh.maxItems = env.getHitsPerPage();
@@ -102,11 +102,11 @@ public class SearchHelperTest {
     }
 
     private SearchHelper getSearchHelperPath(String searchTerm) {
-        SearchHelper sh = new SearchHelper();
+        SearchHelper sh = new SearchHelper(env);
 
         sh.dataRoot = env.getDataRootFile(); // throws Exception if none-existent
         sh.order = SortOrder.RELEVANCY;
-        sh.builder = new QueryBuilder().setPath(searchTerm);
+        sh.builder = new QueryBuilder(env).setPath(searchTerm);
         Assert.assertNotSame(0, sh.builder.getSize());
         sh.start = 0;
         sh.maxItems = env.getHitsPerPage();
@@ -237,6 +237,6 @@ public class SearchHelperTest {
      */
     @Test
     public void testDestroyUninitializedInstance() {
-        new SearchHelper().destroy();
+        new SearchHelper(env).destroy();
     }
 }

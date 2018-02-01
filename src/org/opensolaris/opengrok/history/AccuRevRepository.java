@@ -19,6 +19,7 @@
 
 /*
  * Copyright (c) 2008, 2017, Oracle and/or its affiliates. All rights reserved.
+ * Portions Copyright (c) 2018, Chris Fraire <cfraire@me.com>.
  */
 package org.opensolaris.opengrok.history;
 
@@ -36,7 +37,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.opensolaris.opengrok.configuration.RuntimeEnvironment;
 import org.opensolaris.opengrok.logger.LoggerFactory;
 import org.opensolaris.opengrok.util.Executor;
 
@@ -87,7 +87,6 @@ public class AccuRevRepository extends Repository {
             = Pattern.compile("^Basis:\\s+(\\w+)");
     private static final Pattern workspaceRootPattern
             = Pattern.compile("Top:\\s+(.+)$");
-    private static final RuntimeEnvironment env = RuntimeEnvironment.getInstance();
 
     private String depotName = null;
     private String parent = null;
@@ -129,7 +128,8 @@ public class AccuRevRepository extends Repository {
 
         cmd.add(path);
 
-        Executor executor = new Executor(cmd, file.getParentFile());
+        Executor executor = new Executor(cmd, file.getParentFile(),
+            env.getCommandTimeout());
         executor.exec();
         try (BufferedReader reader
                 = new BufferedReader(executor.getOutputReader())) {
@@ -189,7 +189,7 @@ public class AccuRevRepository extends Repository {
         
         File workingDirectory = file.isDirectory() ? file : file.getParentFile();
         
-        return new Executor(cmd, workingDirectory);
+        return new Executor(cmd, workingDirectory, env.getCommandTimeout());
     }
 
     @Override
@@ -215,7 +215,8 @@ public class AccuRevRepository extends Repository {
         cmd.add("stat");
         cmd.add("-fe");
         cmd.add(basename);
-        Executor executor = new Executor(cmd, directory);
+        Executor executor = new Executor(cmd, directory,
+            env.getCommandTimeout());
         executor.exec();
 
         String elementID = null;
@@ -242,7 +243,7 @@ public class AccuRevRepository extends Repository {
             cmd.add("-e");
             cmd.add(elementID);
 
-            executor = new Executor(cmd, directory);
+            executor = new Executor(cmd, directory, env.getCommandTimeout());
             executor.exec();
 
             inputStream
@@ -260,7 +261,8 @@ public class AccuRevRepository extends Repository {
         cmd.add(RepoCommand);
         cmd.add("update");
 
-        Executor executor = new Executor(cmd, directory);
+        Executor executor = new Executor(cmd, directory,
+            env.getCommandTimeout());
         if (executor.exec() != 0) {
             throw new IOException(executor.getErrorString());
         }
@@ -320,7 +322,8 @@ public class AccuRevRepository extends Repository {
         cmd.add(RepoCommand);
         cmd.add("info");
 
-        Executor executor = new Executor(cmd, realWsPath.toFile());
+        Executor executor = new Executor(cmd, realWsPath.toFile(),
+            env.getCommandTimeout());
         executor.exec();
 
         try (BufferedReader info = new BufferedReader(executor.getOutputReader())) {

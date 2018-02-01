@@ -19,6 +19,7 @@
 
 /*
  * Copyright (c) 2008, 2017, Oracle and/or its affiliates. All rights reserved.
+ * Portions Copyright (c) 2018, Chris Fraire <cfraire@me.com>.
  */
 package org.opensolaris.opengrok.history;
 
@@ -73,7 +74,7 @@ public class SCCSRepository extends Repository {
         try {
             File history = SCCSHistoryParser.getSCCSFile(parent, basename);
             ensureCommand(CMD_PROPERTY_KEY, CMD_FALLBACK);
-            return SCCSget.getRevision(RepoCommand, history, rev);
+            return SCCSget.getRevision(env, RepoCommand, history, rev);
         } catch (FileNotFoundException ex) {
             return null;
         } catch (IOException ex) {

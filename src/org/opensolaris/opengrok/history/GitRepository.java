@@ -19,7 +19,7 @@
 
 /*
  * Copyright (c) 2008, 2017, Oracle and/or its affiliates. All rights reserved.
- * Portions Copyright (c) 2017, Chris Fraire <cfraire@me.com>.
+ * Portions Copyright (c) 2017-2018, Chris Fraire <cfraire@me.com>.
  */
 package org.opensolaris.opengrok.history;
 
@@ -42,7 +42,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.opensolaris.opengrok.configuration.RuntimeEnvironment;
 import org.opensolaris.opengrok.logger.LoggerFactory;
 import org.opensolaris.opengrok.util.Executor;
 import org.opensolaris.opengrok.util.StringUtils;
@@ -128,7 +127,7 @@ public class GitRepository extends Repository {
         cmd.add("--pretty=fuller");
         cmd.add(GIT_DATE_OPT);
 
-        if (file.isFile() && RuntimeEnvironment.getInstance().isHandleHistoryOfRenamedFiles()) {
+        if (file.isFile() && env.isHandleHistoryOfRenamedFiles()) {
             cmd.add("--follow");
         }
 
@@ -141,7 +140,8 @@ public class GitRepository extends Repository {
             cmd.add(filename);
         }
 
-        return new Executor(cmd, new File(getDirectoryName()), sinceRevision != null);
+        return new Executor(cmd, new File(getDirectoryName()),
+            sinceRevision != null ? env.getCommandTimeout() : 0);
     }
 
     Executor getRenamedFilesExecutor(final File file, String sinceRevision) throws IOException {
@@ -169,7 +169,8 @@ public class GitRepository extends Repository {
             cmd.add(file.getCanonicalPath().substring(getDirectoryName().length() + 1));
         }
 
-        return new Executor(cmd, new File(getDirectoryName()), sinceRevision != null);
+        return new Executor(cmd, new File(getDirectoryName()),
+            sinceRevision != null ? env.getCommandTimeout() : 0);
     }
 
     /**
@@ -385,7 +386,8 @@ public class GitRepository extends Repository {
         }
         cmd.add(file.getName());
 
-        Executor exec = new Executor(cmd, file.getParentFile());
+        Executor exec = new Executor(cmd, file.getParentFile(),
+            env.getCommandTimeout());
         int status = exec.exec();
 
         // File might have changed its location
@@ -402,7 +404,7 @@ public class GitRepository extends Repository {
             cmd.add("--");
             cmd.add(findOriginalName(file.getAbsolutePath(), revision));
             File directory = new File(getDirectoryName());
-            exec = new Executor(cmd, directory);
+            exec = new Executor(cmd, directory, env.getCommandTimeout());
             status = exec.exec();
         }
 
@@ -454,7 +456,8 @@ public class GitRepository extends Repository {
         cmd.add("config");
         cmd.add("--list");
 
-        Executor executor = new Executor(cmd, directory);
+        Executor executor = new Executor(cmd, directory,
+            env.getCommandTimeout());
         if (executor.exec() != 0) {
             throw new IOException(executor.getErrorString());
         }
@@ -516,8 +519,8 @@ public class GitRepository extends Repository {
     @Override
     History getHistory(File file, String sinceRevision)
             throws HistoryException {
-        RuntimeEnvironment env = RuntimeEnvironment.getInstance();
-        History result = new GitHistoryParser().parse(file, this, sinceRevision);
+        History result = new GitHistoryParser(env).parse(file, this,
+            sinceRevision);
         // Assign tags to changesets they represent
         // We don't need to check if this repository supports tags,
         // because we know it :-)
@@ -717,7 +720,8 @@ public class GitRepository extends Repository {
         cmd.add("--pretty=%cd" + delim + "%h %an %s");
         cmd.add(GIT_DATE_OPT);
 
-        Executor executor = new Executor(cmd, directory);
+        Executor executor = new Executor(cmd, directory,
+            env.getCommandTimeout());
         if (executor.exec(false) != 0) {
             throw new IOException(executor.getErrorString());
         }

@@ -19,7 +19,7 @@
 
 /*
  * Copyright (c) 2007, 2017, Oracle and/or its affiliates. All rights reserved.
- * Portions Copyright (c) 2017, Chris Fraire <cfraire@me.com>.
+ * Portions Copyright (c) 2017-2018, Chris Fraire <cfraire@me.com>.
  */
 package org.opensolaris.opengrok.history;
 
@@ -119,7 +119,8 @@ public class SubversionRepository extends Repository {
         cmd.add("--xml");
         File directory = new File(getDirectoryName());
 
-        Executor executor = new Executor(cmd, directory);
+        Executor executor = new Executor(cmd, directory,
+            env.getCommandTimeout());
         if (executor.exec() == 0) {
             try {
                 DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
@@ -226,7 +227,8 @@ public class SubversionRepository extends Repository {
             cmd.add(escapeFileName(filename));
         }
 
-        return new Executor(cmd, new File(getDirectoryName()), sinceRevision != null);
+        return new Executor(cmd, new File(getDirectoryName()),
+            sinceRevision != null ? env.getCommandTimeout() : 0);
     }
 
     @Override
@@ -255,7 +257,8 @@ public class SubversionRepository extends Repository {
         cmd.add(rev);
         cmd.add(escapeFileName(filename));
 
-        Executor executor = new Executor(cmd, directory);
+        Executor executor = new Executor(cmd, directory,
+            env.getCommandTimeout());
         if (executor.exec() == 0) {
             ret = executor.getOutputStream();
         }
@@ -280,7 +283,7 @@ public class SubversionRepository extends Repository {
 
     private History getHistory(File file, String sinceRevision, int numEntries)
             throws HistoryException {
-        return new SubversionHistoryParser().parse(file, this, sinceRevision,
+        return new SubversionHistoryParser(env).parse(file, this, sinceRevision,
                 numEntries);
     }
 
@@ -414,7 +417,8 @@ public class SubversionRepository extends Repository {
         cmd.add("update");
         cmd.addAll(getAuthCommandLineParams());
         cmd.add("--non-interactive");
-        Executor executor = new Executor(cmd, directory);
+        Executor executor = new Executor(cmd, directory,
+            env.getCommandTimeout());
         if (executor.exec() != 0) {
             throw new IOException(executor.getErrorString());
         }
