@@ -19,7 +19,7 @@
 
 /*
  * Copyright (c) 2008, 2017, Oracle and/or its affiliates. All rights reserved.
- * Portions Copyright (c) 2017, Chris Fraire <cfraire@me.com>.
+ * Portions Copyright (c) 2017-2018, Chris Fraire <cfraire@me.com>.
  */
 package org.opensolaris.opengrok.history;
 
@@ -88,6 +88,7 @@ public final class RepositoryFactory {
      * on multiple files, it should be parallelized, e.g. like it is done in
      * {@code invalidateRepositories()}.
      *
+     * @param env a defined instance
      * @param file File that might contain a repository
      * @return Correct repository for the given file
      * @throws InstantiationException in case we cannot create the repository object
@@ -95,9 +96,9 @@ public final class RepositoryFactory {
      * @throws NoSuchMethodException in case we cannot create the repository object
      * @throws InvocationTargetException in case we cannot create the repository object
      */
-    public static Repository getRepository(File file) throws InstantiationException, IllegalAccessException, 
+    public static Repository getRepository(RuntimeEnvironment env, File file)
+            throws InstantiationException, IllegalAccessException,
             NoSuchMethodException, InvocationTargetException {
-        RuntimeEnvironment env = RuntimeEnvironment.getInstance();
         Repository repo = null;
 
         for (Repository rep : repositories) {
@@ -165,6 +166,7 @@ public final class RepositoryFactory {
      * Returns a repository for the given file, or null if no repository was
      * found.
      *
+     * @param env a defined instance
      * @param info Information about the repository
      * @return Correct repository for the given file
      * @throws InstantiationException in case we cannot create the repository object
@@ -172,9 +174,11 @@ public final class RepositoryFactory {
      * @throws NoSuchMethodException in case we cannot create the repository object
      * @throws InvocationTargetException in case we cannot create the repository object
      */
-    public static Repository getRepository(RepositoryInfo info) throws InstantiationException, IllegalAccessException, 
-            NoSuchMethodException, InvocationTargetException {
-        return getRepository(new File(info.getDirectoryName()));
+    public static Repository getRepository(RuntimeEnvironment env,
+        RepositoryInfo info) throws InstantiationException,
+            IllegalAccessException, NoSuchMethodException,
+            InvocationTargetException {
+        return getRepository(env, new File(info.getDirectoryName()));
     }
 
     /**

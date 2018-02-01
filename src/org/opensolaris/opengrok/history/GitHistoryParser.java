@@ -19,7 +19,7 @@
 
 /*
  * Copyright (c) 2007, 2017, Oracle and/or its affiliates. All rights reserved.
- * Portions Copyright (c) 2017, Chris Fraire <cfraire@me.com>.
+ * Portions Copyright (c) 2017-2018, Chris Fraire <cfraire@me.com>.
  */
 package org.opensolaris.opengrok.history;
 
@@ -55,9 +55,17 @@ class GitHistoryParser implements Executor.StreamHandler {
 
         HEADER, MESSAGE, FILES
     }
+    private final RuntimeEnvironment env;
     private String myDir;
     private GitRepository repository = new GitRepository();
     private List<HistoryEntry> entries = new ArrayList<>();
+
+    public GitHistoryParser(RuntimeEnvironment env) {
+        if (env == null) {
+            throw new IllegalArgumentException("`env' is null");
+        }
+        this.env = env;
+    }
 
     /**
      * Process the output from the log command and insert the HistoryEntries
@@ -75,7 +83,6 @@ class GitHistoryParser implements Executor.StreamHandler {
     
     private void process(BufferedReader in) throws IOException {
         DateFormat df = repository.getDateFormat();
-        RuntimeEnvironment env = RuntimeEnvironment.getInstance();
         entries = new ArrayList<>();
         HistoryEntry entry = null;
         ParseState state = ParseState.HEADER;
@@ -177,7 +184,7 @@ class GitHistoryParser implements Executor.StreamHandler {
                                 status));
             }
 
-            if (RuntimeEnvironment.getInstance().isHandleHistoryOfRenamedFiles()) {
+            if (env.isHandleHistoryOfRenamedFiles()) {
                 executor = repository.getRenamedFilesExecutor(file, sinceRevision);
                 status = executor.exec(true, parser);
 
@@ -205,7 +212,7 @@ class GitHistoryParser implements Executor.StreamHandler {
      * @throws IOException if we fail to parse the buffer
      */
     History parse(String buffer) throws IOException {
-        myDir = RuntimeEnvironment.getInstance().getSourceRootPath();
+        myDir = env.getSourceRootPath();
         processStream(new ByteArrayInputStream(buffer.getBytes("UTF-8")));
         return new History(entries);
     }
@@ -258,8 +265,6 @@ class GitHistoryParser implements Executor.StreamHandler {
              * A foo2.f
              * A main.c
              */
-            RuntimeEnvironment env = RuntimeEnvironment.getInstance();
-
             try (BufferedReader in = new BufferedReader(new InputStreamReader(input))) {
                 String line;
                 Pattern pattern = Pattern.compile("^R\\d+\\s.*");

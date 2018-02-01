@@ -42,6 +42,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
@@ -114,6 +115,7 @@ public class IndexDatabase {
 
     private final Object INSTANCE_LOCK = new Object();
 
+    private final RuntimeEnvironment env;
     private Project project;
     private FSDirectory indexDirectory;
     private IndexReader reader;
@@ -135,7 +137,6 @@ public class IndexDatabase {
     private List<String> directories;
     private LockFactory lockfact;
     private final BytesRef emptyBR = new BytesRef("");
-    private IndexerParallelizer parallelizer;
 
     // Directory where we store indexes
     public static final String INDEX_DIR = "index";
@@ -145,20 +146,27 @@ public class IndexDatabase {
      * Create a new instance of the Index Database. Use this constructor if you
      * don't use any projects
      *
+     * @param env a defined instance
      * @throws java.io.IOException if an error occurs while creating directories
      */
-    public IndexDatabase() throws IOException {
-        this(null);
+    public IndexDatabase(RuntimeEnvironment env) throws IOException {
+        this(env, null);
     }
 
     /**
      * Create a new instance of an Index Database for a given project
      *
+     * @param env a defined instance
      * @param project the project to create the database for
      * @throws java.io.IOException if an error occurs while creating
      * directories
      */
-    public IndexDatabase(Project project) throws IOException {
+    public IndexDatabase(RuntimeEnvironment env, Project project)
+            throws IOException {
+        if (env == null) {
+            throw new IllegalArgumentException("`env' is null");
+        }
+        this.env = env;
         this.project = project;
         lockfact = NoLockFactory.INSTANCE;
         initialize();
@@ -174,12 +182,12 @@ public class IndexDatabase {
      * Update the index database for all of the projects. Print progress to
      * standard out.
      *
-     * @param parallelizer a defined instance
+     * @param env a defined instance
      * @throws IOException if an error occurs
      */
-    public static void updateAll(IndexerParallelizer parallelizer)
+    public static void updateAll(RuntimeEnvironment env)
             throws IOException {
-        updateAll(parallelizer, null);
+        updateAll(env, null);
     }
 
     /**
@@ -189,19 +197,20 @@ public class IndexDatabase {
      * @param listener where to signal the changes to the database
      * @throws IOException if an error occurs
      */
-    static void updateAll(IndexerParallelizer parallelizer,
-        IndexChangedListener listener) throws IOException {
-        RuntimeEnvironment env = RuntimeEnvironment.getInstance();
+    static CountDownLatch updateAll(RuntimeEnvironment env,
+            IndexChangedListener listener) throws IOException {
         List<IndexDatabase> dbs = new ArrayList<>();
 
         if (env.hasProjects()) {
             for (Project project : env.getProjectList()) {
-                dbs.add(new IndexDatabase(project));
+                dbs.add(new IndexDatabase(env, project));
             }
         } else {
-            dbs.add(new IndexDatabase());
+            dbs.add(new IndexDatabase(env));
         }
 
+        IndexerParallelizer parallelizer = env.getIndexerParallelizer();
+        CountDownLatch latch = new CountDownLatch(dbs.size());
         for (IndexDatabase d : dbs) {
             final IndexDatabase db = d;
             if (listener != null) {
@@ -212,30 +221,34 @@ public class IndexDatabase {
                 @Override
                 public void run() {
                     try {
-                        db.update(parallelizer);
+                        db.update();
                     } catch (Throwable e) {
                         LOGGER.log(Level.SEVERE, "Problem updating lucene index database: ", e);
+                    } finally {
+                        latch.countDown();
                     }
                 }
             });
         }
+        return latch;
     }
 
     /**
      * Update the index database for a number of sub-directories
      *
-     * @param parallelizer a defined instance
+     * @param env a defined instance
      * @param listener where to signal the changes to the database
      * @param paths list of paths to be indexed
      * @throws IOException if an error occurs
      */
-    public static void update(IndexerParallelizer parallelizer,
-        IndexChangedListener listener, List<String> paths) throws IOException {
-        RuntimeEnvironment env = RuntimeEnvironment.getInstance();
+    public static void update(RuntimeEnvironment env,
+            IndexChangedListener listener, List<String> paths)
+            throws IOException {
+        IndexerParallelizer parallelizer = env.getIndexerParallelizer();
         List<IndexDatabase> dbs = new ArrayList<>();
 
         for (String path : paths) {
-            Project project = Project.getProject(path);
+            Project project = env.getProject(path);
             if (project == null && env.hasProjects()) {
                 LOGGER.log(Level.WARNING, "Could not find a project for \"{0}\"", path);
             } else {
@@ -243,9 +256,9 @@ public class IndexDatabase {
 
                 try {
                     if (project == null) {
-                        db = new IndexDatabase();
+                        db = new IndexDatabase(env);
                     } else {
-                        db = new IndexDatabase(project);
+                        db = new IndexDatabase(env, project);
                     }
 
                     int idx = dbs.indexOf(db);
@@ -272,7 +285,7 @@ public class IndexDatabase {
                     @Override
                     public void run() {
                         try {
-                            db.update(parallelizer);
+                            db.update();
                         } catch (Throwable e) {
                             LOGGER.log(Level.SEVERE, "An error occurred while updating index", e);
                         }
@@ -285,7 +298,6 @@ public class IndexDatabase {
     @SuppressWarnings("PMD.CollapsibleIfStatements")
     private void initialize() throws IOException {
         synchronized (INSTANCE_LOCK) {
-            RuntimeEnvironment env = RuntimeEnvironment.getInstance();
             File indexDir = new File(env.getDataRootFile(), INDEX_DIR);
             if (project != null) {
                 indexDir = new File(indexDir, project.getPath());
@@ -302,7 +314,6 @@ public class IndexDatabase {
             indexDirectory = FSDirectory.open(indexDir.toPath(), lockfact);
             ignoredNames = env.getIgnoredNames();
             includedNames = env.getIncludedNames();
-            analyzerGuru = new AnalyzerGuru();
             if (env.isGenerateHtml()) {
                 xrefDir = new File(env.getDataRootFile(), XREF_DIR);
             }
@@ -329,7 +340,7 @@ public class IndexDatabase {
         } else if (directory.charAt(0) != '/') {
             directory = "/" + directory;
         }
-        File file = new File(RuntimeEnvironment.getInstance().getSourceRootFile(), directory);
+        File file = new File(env.getSourceRootFile(), directory);
         if (file.exists()) {
             directories.add(directory);
             return true;
@@ -339,7 +350,7 @@ public class IndexDatabase {
 
     private int getFileCount(File sourceRoot, String dir) throws IOException {
         int file_cnt = 0;
-        if (RuntimeEnvironment.getInstance().isPrintProgress()) {
+        if (env.isPrintProgress()) {
             IndexDownArgs args = new IndexDownArgs();
             args.count_only = true;
 
@@ -354,8 +365,6 @@ public class IndexDatabase {
     }
 
     private void markProjectIndexed(Project project) throws IOException {
-        RuntimeEnvironment env = RuntimeEnvironment.getInstance();
-
         // Successfully indexed the project. The message is sent even if
         // the project's isIndexed() is true because it triggers RepositoryInfo
         // refresh.
@@ -380,11 +389,9 @@ public class IndexDatabase {
 
     /**
      * Update the content of this index database
-     *
-     * @param parallelizer a defined instance
      * @throws IOException if an error occurs
      */
-    public void update(IndexerParallelizer parallelizer)
+    public void update()
             throws IOException {
         synchronized (lock) {
             if (running) {
@@ -394,9 +401,6 @@ public class IndexDatabase {
             interrupted = false;
         }
 
-        this.parallelizer = parallelizer;
-        RuntimeEnvironment env = RuntimeEnvironment.getInstance();
-
         reader = null;
         writer = null;
         settings = null;
@@ -405,7 +409,7 @@ public class IndexDatabase {
 
         IOException finishingException = null;
         try {
-            FileAnalyzer analyzer = AnalyzerGuru.getAnalyzer();
+            FileAnalyzer analyzer = env.getAnalyzerGuru().getAnalyzer();
             analyzer.setAllNonWhitespace(env.isAllNonWhitespace());
             IndexWriterConfig iwc = new IndexWriterConfig(analyzer);
             iwc.setOpenMode(OpenMode.CREATE_OR_APPEND);
@@ -439,7 +443,7 @@ public class IndexDatabase {
 
                 if (env.isHistoryEnabled()) {
                     try {
-                        HistoryGuru.getInstance().ensureHistoryCacheExists(
+                        env.getHistoryGuru().ensureHistoryCacheExists(
                             sourceRoot);
                     } catch (HistoryException ex) {
                         String exmsg = String.format(
@@ -546,18 +550,19 @@ public class IndexDatabase {
      * @param parallelizer a defined instance
      * @throws IOException if an error occurs
      */
-    static void optimizeAll(IndexerParallelizer parallelizer)
+    static CountDownLatch optimizeAll(RuntimeEnvironment env)
             throws IOException {
         List<IndexDatabase> dbs = new ArrayList<>();
-        RuntimeEnvironment env = RuntimeEnvironment.getInstance();
+        IndexerParallelizer parallelizer = env.getIndexerParallelizer();
         if (env.hasProjects()) {
             for (Project project : env.getProjectList()) {
-                dbs.add(new IndexDatabase(project));
+                dbs.add(new IndexDatabase(env, project));
             }
         } else {
-            dbs.add(new IndexDatabase());
+            dbs.add(new IndexDatabase(env));
         }
 
+        CountDownLatch latch = new CountDownLatch(dbs.size());
         for (IndexDatabase d : dbs) {
             final IndexDatabase db = d;
             if (db.isDirty()) {
@@ -565,15 +570,18 @@ public class IndexDatabase {
                     @Override
                     public void run() {
                         try {
-                            db.update(parallelizer);
+                            db.update();
                         } catch (Throwable e) {
                             LOGGER.log(Level.SEVERE,
                                 "Problem updating lucene index database: ", e);
+                        } finally {
+                            latch.countDown();
                         }
                     }
                 });
             }
         }
+        return latch;
     }
 
     /**
@@ -656,7 +664,7 @@ public class IndexDatabase {
      */
     private void removeXrefFile(String path) {
         File xrefFile;
-        if (RuntimeEnvironment.getInstance().isCompressXref()) {
+        if (env.isCompressXref()) {
             xrefFile = new File(xrefDir, path + ".gz");
         } else {
             xrefFile = new File(xrefDir, path);
@@ -667,7 +675,7 @@ public class IndexDatabase {
     }
 
     private void removeHistoryFile(String path) {
-        HistoryGuru.getInstance().clearCacheFile(path);
+        env.getHistoryGuru().clearCacheFile(path);
     }
 
     /**
@@ -716,13 +724,14 @@ public class IndexDatabase {
 
         ctags.setTabSize(project != null ? project.getTabSize() : 0);
         if (ctags.getBinary() != null) fa.setCtags(ctags);
-        fa.setProject(Project.getProject(path));
-        fa.setScopesEnabled(RuntimeEnvironment.getInstance().isScopesEnabled());
-        fa.setFoldingEnabled(RuntimeEnvironment.getInstance().isFoldingEnabled());
+        fa.setProject(env.getProject(path));
+        fa.setScopesEnabled(env.isScopesEnabled());
+        fa.setFoldingEnabled(env.isFoldingEnabled());
 
         Document doc = new Document();
         try (Writer xrefOut = getXrefWriter(fa, path)) {
-            analyzerGuru.populateDocument(doc, file, path, fa, xrefOut);
+            env.getAnalyzerGuru().populateDocument(doc, file, path, fa,
+                xrefOut);
         } catch (InterruptedException e) {
             LOGGER.log(Level.WARNING, "File ''{0}'' interrupted--{1}",
                 new Object[]{path, e.getMessage()});
@@ -765,7 +774,7 @@ public class IndexDatabase {
         FileAnalyzer fa;
         try (InputStream in = new BufferedInputStream(
                 new FileInputStream(file))) {
-            return AnalyzerGuru.getAnalyzer(in, path);
+            return env.getAnalyzerGuru().getAnalyzer(in, path);
         }
     }
 
@@ -843,13 +852,12 @@ public class IndexDatabase {
             return true;
         }
 
-        if (HistoryGuru.getInstance().hasHistory(file)) {
+        if (env.getHistoryGuru().hasHistory(file)) {
             // versioned files should always be accepted
             return true;
         }
 
         // this is an unversioned file, check if it should be indexed
-        RuntimeEnvironment env = RuntimeEnvironment.getInstance();
         boolean res = !env.isIndexVersionedFilesOnly();
         if (!res) {
             LOGGER.log(Level.FINER, "not accepting unversioned {0}",
@@ -899,7 +907,7 @@ public class IndexDatabase {
             return true;
         }
 
-        for (String allowedSymlink : RuntimeEnvironment.getInstance().getAllowedSymlinks()) {
+        for (String allowedSymlink : env.getAllowedSymlinks()) {
             if (absolutePath.startsWith(allowedSymlink)) {
                 String allowedTarget = new File(allowedSymlink).getCanonicalPath();
                 if (canonicalPath.startsWith(allowedTarget)
@@ -919,7 +927,6 @@ public class IndexDatabase {
      * @return true if the file is local to the current repository
      */
     private boolean isLocal(String path) {
-        RuntimeEnvironment env = RuntimeEnvironment.getInstance();
         String srcRoot = env.getSourceRootPath();
 
         boolean local = false;
@@ -927,7 +934,7 @@ public class IndexDatabase {
         if (path.startsWith(srcRoot)) {
             if (env.hasProjects()) {
                 String relPath = path.substring(srcRoot.length());
-                if (project.equals(Project.getProject(relPath))) {
+                if (project.equals(env.getProject(relPath))) {
                     // File is under the current project, so it's local.
                     local = true;
                 }
@@ -942,7 +949,7 @@ public class IndexDatabase {
     }
 
     private void printProgress(int currentCount, int totalCount) {
-        if (RuntimeEnvironment.getInstance().isPrintProgress()
+        if (env.isPrintProgress()
             && totalCount > 0 && LOGGER.isLoggable(Level.INFO)) {
                 LOGGER.log(Level.INFO, "Progress: {0} ({1}%)",
                     new Object[]{currentCount,
@@ -1058,6 +1065,7 @@ public class IndexDatabase {
         AtomicInteger successCounter = new AtomicInteger();
         AtomicInteger currentCounter = new AtomicInteger();
         AtomicInteger alreadyClosedCounter = new AtomicInteger();
+        IndexerParallelizer parallelizer = env.getIndexerParallelizer();
         ObjectPool<Ctags> ctagsPool = parallelizer.getCtagsPool();
 
         Map<Boolean, List<IndexFileWork>> bySuccess = null;
@@ -1185,44 +1193,47 @@ public class IndexDatabase {
     /**
      * Get all files in all of the index databases.
      *
+     * @param env a defined instance
      * @throws IOException if an error occurs
      * @return set of files
      */
-    public static Set<String> getAllFiles() throws IOException {
-        return getAllFiles(null);
+    public static Set<String> getAllFiles(RuntimeEnvironment env)
+            throws IOException {
+        return getAllFiles(env, null);
     }
 
     /**
      * List all files in some of the index databases.
      *
+     * @param env a defined instance
      * @param subFiles Subdirectories for the various projects to list the files
      * for (or null or an empty list to dump all projects)
      * @throws IOException if an error occurs
      * @return set of files in the index databases specified by the subFiles parameter
      */
-    public static Set<String> getAllFiles(List<String> subFiles) throws IOException {
+    public static Set<String> getAllFiles(RuntimeEnvironment env,
+            List<String> subFiles) throws IOException {
         Set<String> files = new HashSet<>();
-        RuntimeEnvironment env = RuntimeEnvironment.getInstance();
 
         if (env.hasProjects()) {
             if (subFiles == null || subFiles.isEmpty()) {
                 for (Project project : env.getProjectList()) {
-                    IndexDatabase db = new IndexDatabase(project);
+                    IndexDatabase db = new IndexDatabase(env, project);
                     files.addAll(db.getFiles());
                 }
             } else {
                 for (String path : subFiles) {
-                    Project project = Project.getProject(path);
+                    Project project = env.getProject(path);
                     if (project == null) {
                         LOGGER.log(Level.WARNING, "Could not find a project for \"{0}\"", path);
                     } else {
-                        IndexDatabase db = new IndexDatabase(project);
+                        IndexDatabase db = new IndexDatabase(env, project);
                         files.addAll(db.getFiles());
                     }
                 }
             }
         } else {
-            IndexDatabase db = new IndexDatabase();
+            IndexDatabase db = new IndexDatabase(env);
             files = db.getFiles();
         }
 
@@ -1294,33 +1305,33 @@ public class IndexDatabase {
         return numDocs;
     }
 
-    static void listFrequentTokens() throws IOException {
-        listFrequentTokens(null);
+    static void listFrequentTokens(RuntimeEnvironment env) throws IOException {
+        listFrequentTokens(env, null);
     }
 
-    static void listFrequentTokens(List<String> subFiles) throws IOException {
+    static void listFrequentTokens(RuntimeEnvironment env,
+            List<String> subFiles) throws IOException {
         final int limit = 4;
 
-        RuntimeEnvironment env = RuntimeEnvironment.getInstance();
         if (env.hasProjects()) {
             if (subFiles == null || subFiles.isEmpty()) {
                 for (Project project : env.getProjectList()) {
-                    IndexDatabase db = new IndexDatabase(project);
+                    IndexDatabase db = new IndexDatabase(env, project);
                     db.listTokens(limit);
                 }
             } else {
                 for (String path : subFiles) {
-                    Project project = Project.getProject(path);
+                    Project project = env.getProject(path);
                     if (project == null) {
                         LOGGER.log(Level.WARNING, "Could not find a project for \"{0}\"", path);
                     } else {
-                        IndexDatabase db = new IndexDatabase(project);
+                        IndexDatabase db = new IndexDatabase(env, project);
                         db.listTokens(limit);
                     }
                 }
             }
         } else {
-            IndexDatabase db = new IndexDatabase();
+            IndexDatabase db = new IndexDatabase(env);
             db.listTokens(limit);
         }
     }
@@ -1365,14 +1376,14 @@ public class IndexDatabase {
      * @return The index database where the file should be located or null if it
      * cannot be located.
      */
-    public static IndexReader getIndexReader(String path) {
+    public static IndexReader getIndexReader(RuntimeEnvironment env,
+            String path) {
         IndexReader ret = null;
 
-        RuntimeEnvironment env = RuntimeEnvironment.getInstance();
         File indexDir = new File(env.getDataRootFile(), INDEX_DIR);
 
         if (env.hasProjects()) {
-            Project p = Project.getProject(path);
+            Project p = env.getProject(path);
             if (p == null) {
                 return null;
             }
@@ -1401,9 +1412,8 @@ public class IndexDatabase {
      * @throws ClassNotFoundException if the class for the stored definitions
      * instance cannot be found
      */
-    public static Definitions getDefinitions(File file)
+    public static Definitions getDefinitions(RuntimeEnvironment env, File file)
             throws IOException, ParseException, ClassNotFoundException {
-        RuntimeEnvironment env = RuntimeEnvironment.getInstance();
         String path;
         try {
             path = env.getPathRelativeToSourceRoot(file);
@@ -1415,7 +1425,7 @@ public class IndexDatabase {
         //in order not to conflict with Lucene escape character
         path=path.replace("\\", "/");
 
-        IndexReader ireader = getIndexReader(path);
+        IndexReader ireader = getIndexReader(env, path);
 
         if (ireader == null) {
             // No index, no definitions...
@@ -1423,7 +1433,7 @@ public class IndexDatabase {
         }
 
         try {
-            Query q = new QueryBuilder().setPath(path).build();
+            Query q = new QueryBuilder(env).setPath(path).build();
             IndexSearcher searcher = new IndexSearcher(ireader);
             TopDocs top = searcher.search(q, 1);
             if (top.totalHits == 0) {
@@ -1477,7 +1487,6 @@ public class IndexDatabase {
     private Writer getXrefWriter(FileAnalyzer fa, String path) throws IOException {
         Genre g = fa.getFactory().getGenre();
         if (xrefDir != null && (g == Genre.PLAIN || g == Genre.XREFABLE)) {
-            RuntimeEnvironment env = RuntimeEnvironment.getInstance();
             boolean compressed = env.isCompressXref();
             File xrefFile = new File(xrefDir, path + (compressed ? ".gz" : ""));
             File parentFile = xrefFile.getParentFile();
@@ -1571,7 +1580,7 @@ public class IndexDatabase {
                 continue;
             }
 
-            long reqGuruVersion = AnalyzerGuru.getVersionNo();
+            long reqGuruVersion = env.getAnalyzerGuru().getVersionNo();
             Long actGuruVersion = settings.getAnalyzerGuruVersion();
             /**
              * For an older OpenGrok index that does not yet have a defined,
@@ -1611,7 +1620,8 @@ public class IndexDatabase {
             }
 
             // Verify ZVER, or return a value to indicate mismatch.
-            long reqVersion = AnalyzerGuru.getAnalyzerVersionNo(fileTypeName);
+            long reqVersion = env.getAnalyzerGuru().getAnalyzerVersionNo(
+                fileTypeName);
             IndexableField zver = doc.getField(QueryBuilder.ZVER);
             Long actVersion = zver == null ? null :
                 zver.numericValue().longValue();

@@ -90,11 +90,11 @@ public class SearchAndContextFormatterTest2 {
         File dataroot = createTemporaryDirectory("dataroot");
         assertTrue("dataroot.isDirectory()", dataroot.isDirectory());
 
-        repository1 = new TestRepository();
+        repository1 = new TestRepository(env);
         repository1.create(HistoryGuru.class.getResourceAsStream(
             "repositories.zip"));
 
-        repository2 = new TestRepository();
+        repository2 = new TestRepository(env);
         repository2.create(HistoryGuru.class.getResourceAsStream(
             "repositories.zip"));
 
@@ -134,7 +134,7 @@ public class SearchAndContextFormatterTest2 {
             assertNotNull("symlink1 project", proj1);
             proj1.setTabSize(TABSIZE);
 
-            Indexer.getInstance().doIndexerExecution(true, null, null);
+            Indexer.getInstance().doIndexerExecution(env, true, null, null);
         } else {
             System.out.println(
                 "Skipping test. Could not find a ctags I could use in path.");
@@ -143,8 +143,7 @@ public class SearchAndContextFormatterTest2 {
 
         configFile = File.createTempFile("configuration", ".xml");
         env.writeConfiguration(configFile);
-        RuntimeEnvironment.getInstance().readConfiguration(new File(
-            configFile.getAbsolutePath()));
+        env.readConfiguration(new File(configFile.getAbsolutePath()));
     }
 
     @AfterClass
@@ -194,7 +193,7 @@ public class SearchAndContextFormatterTest2 {
         SearchEngine instance;
         int noHits;
 
-        instance = new SearchEngine();
+        instance = new SearchEngine(env);
         instance.setFreetext("Hello");
         instance.setFile("renamed2.c");
         noHits = instance.search();
@@ -221,8 +220,7 @@ public class SearchAndContextFormatterTest2 {
          * The following `anz' should go unused, but UnifiedHighlighter demands
          * an analyzer "even if in some circumstances it isn't used."
          */
-        PlainAnalyzerFactory fac = PlainAnalyzerFactory.DEFAULT_INSTANCE;
-        FileAnalyzer anz = fac.getAnalyzer();
+        FileAnalyzer anz = env.getAnalyzerGuru().getPlainAnalyzer();
 
         ContextFormatter formatter = new ContextFormatter(args);
         OGKUnifiedHighlighter uhi = new OGKUnifiedHighlighter(env,

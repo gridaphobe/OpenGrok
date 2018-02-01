@@ -19,6 +19,7 @@
 
 /*
  * Copyright (c) 2008, 2017, Oracle and/or its affiliates. All rights reserved.
+ * Portions Copyright (c) 2018, Chris Fraire <cfraire@me.com>.
  */
 package org.opensolaris.opengrok.history;
 
@@ -34,6 +35,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.opensolaris.opengrok.configuration.RuntimeEnvironment;
 
 import org.opensolaris.opengrok.logger.LoggerFactory;
 import org.opensolaris.opengrok.util.Executor;
@@ -71,8 +73,8 @@ public class PerforceRepository extends Repository {
     public Annotation annotate(File file, String rev) throws IOException {
         Annotation a = new Annotation(file.getName());
 
-        List<HistoryEntry> revisions
-                = PerforceHistoryParser.getRevisions(file, rev).getHistoryEntries();
+        List<HistoryEntry> revisions = PerforceHistoryParser.getRevisions(env,
+            file, rev).getHistoryEntries();
         HashMap<String, String> revAuthor = new HashMap<>();
         for (HistoryEntry entry : revisions) {
             // a.addDesc(entry.getRevision(), entry.getMessage());
@@ -86,7 +88,8 @@ public class PerforceRepository extends Repository {
         cmd.add("-qci");
         cmd.add(file.getPath() + getRevisionCmd(rev));
 
-        Executor executor = new Executor(cmd, file.getParentFile());
+        Executor executor = new Executor(cmd, file.getParentFile(),
+            env.getCommandTimeout());
         executor.exec();
 
         String line;
@@ -120,7 +123,8 @@ public class PerforceRepository extends Repository {
         cmd.add("print");
         cmd.add("-q");
         cmd.add(basename + getRevisionCmd(rev));
-        Executor executor = new Executor(cmd, new File(parent));
+        Executor executor = new Executor(cmd, new File(parent),
+            env.getCommandTimeout());
         executor.exec();
         return new ByteArrayInputStream(executor.getOutputString().getBytes());
     }
@@ -133,7 +137,8 @@ public class PerforceRepository extends Repository {
         ensureCommand(CMD_PROPERTY_KEY, CMD_FALLBACK);
         cmd.add(RepoCommand);
         cmd.add("sync");
-        Executor executor = new Executor(cmd, directory);
+        Executor executor = new Executor(cmd, directory,
+            env.getCommandTimeout());
         if (executor.exec() != 0) {
             throw new IOException(executor.getErrorString());
         }
@@ -155,10 +160,11 @@ public class PerforceRepository extends Repository {
     /**
      * Check if a given file is in the depot
      *
+     * @param env a defined instance
      * @param file The file to test
      * @return true if the given file is in the depot, false otherwise
      */
-    public static boolean isInP4Depot(File file) {
+    public static boolean isInP4Depot(RuntimeEnvironment env, File file) {
         boolean status = false;
         if (testRepo.isWorking()) {
             ArrayList<String> cmd = new ArrayList<>();
@@ -170,7 +176,8 @@ public class PerforceRepository extends Repository {
                 cmd.add(testRepo.RepoCommand);
                 cmd.add("dirs");
                 cmd.add(name);
-                Executor executor = new Executor(cmd, dir);
+                Executor executor = new Executor(cmd, dir,
+                    env.getCommandTimeout());
                 executor.exec();
                 /* OUTPUT:
                  stdout: //depot_path/name
@@ -183,7 +190,8 @@ public class PerforceRepository extends Repository {
                 cmd.add(testRepo.RepoCommand);
                 cmd.add("files");
                 cmd.add(name);
-                Executor executor = new Executor(cmd, dir);
+                Executor executor = new Executor(cmd, dir,
+                    env.getCommandTimeout());
                 executor.exec();
                 /* OUTPUT:
                  stdout: //depot_path/name
@@ -197,7 +205,7 @@ public class PerforceRepository extends Repository {
 
     @Override
     boolean isRepositoryFor(File file) {
-        return isInP4Depot(file);
+        return isInP4Depot(env, file);
     }
 
     @Override
@@ -216,7 +224,7 @@ public class PerforceRepository extends Repository {
 
     @Override
     History getHistory(File file) throws HistoryException {
-        return new PerforceHistoryParser().parse(file, this);
+        return new PerforceHistoryParser(env).parse(file, this);
     }
 
     @Override

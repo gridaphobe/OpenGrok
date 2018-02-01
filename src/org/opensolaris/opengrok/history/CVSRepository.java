@@ -19,7 +19,7 @@
 
 /*
  * Copyright (c) 2008, 2017, Oracle and/or its affiliates. All rights reserved.
- * Portions Copyright (c) 2017, Chris Fraire <cfraire@me.com>.
+ * Portions Copyright (c) 2017-2018, Chris Fraire <cfraire@me.com>.
  */
 package org.opensolaris.opengrok.history;
 
@@ -157,7 +157,8 @@ public class CVSRepository extends RCSRepository {
         ensureCommand(CMD_PROPERTY_KEY, CMD_FALLBACK);
         cmd.add(RepoCommand);
         cmd.add("update");
-        Executor executor = new Executor(cmd, directory);
+        Executor executor = new Executor(cmd, directory,
+            env.getCommandTimeout());
         if (executor.exec() != 0) {
             throw new IOException(executor.getErrorString());
         }
@@ -216,7 +217,8 @@ public class CVSRepository extends RCSRepository {
             cmd.add(filename);
         }
 
-        return new Executor(cmd, new File(getDirectoryName()));
+        return new Executor(cmd, new File(getDirectoryName()),
+            env.getCommandTimeout());
     }
 
     @Override
@@ -298,7 +300,8 @@ public class CVSRepository extends RCSRepository {
         }
         cmd.add(file.getName());
 
-        Executor exec = new Executor(cmd, file.getParentFile());
+        Executor exec = new Executor(cmd, file.getParentFile(),
+            env.getCommandTimeout());
         int status = exec.exec();
 
         if (status != 0) {

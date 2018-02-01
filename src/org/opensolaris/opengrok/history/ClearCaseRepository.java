@@ -19,7 +19,7 @@
 
 /*
  * Copyright (c) 2008, 2017, Oracle and/or its affiliates. All rights reserved.
- * Portions Copyright (c) 2017, Chris Fraire <cfraire@me.com>.
+ * Portions Copyright (c) 2017-2018, Chris Fraire <cfraire@me.com>.
  */
 package org.opensolaris.opengrok.history;
 
@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
+import org.opensolaris.opengrok.configuration.RuntimeEnvironment;
 import org.opensolaris.opengrok.logger.LoggerFactory;
 import org.opensolaris.opengrok.util.Executor;
 import org.opensolaris.opengrok.util.IOUtils;
@@ -58,6 +59,10 @@ public class ClearCaseRepository extends Repository {
      * The command to use to access the repository if none was given explicitly
      */
     public static final String CMD_FALLBACK = "cleartool";
+
+    private static transient final Object VOBS_HOLDER_LOCK = new Object();
+
+    private static transient volatile VobsHolder vobsHolder;
 
     private boolean verbose;
 
@@ -107,7 +112,8 @@ public class ClearCaseRepository extends Repository {
         cmd.add("%e\n%Nd\n%Fu (%u)\n%Vn\n%Nc\n.\n");
         cmd.add(filename);
 
-        return new Executor(cmd, new File(getDirectoryName()));
+        return new Executor(cmd, new File(getDirectoryName()),
+            env.getCommandTimeout());
     }
 
     @Override
@@ -361,21 +367,34 @@ public class ClearCaseRepository extends Repository {
     }
 
     private static class VobsHolder {
-
-        public static String[] vobs = runLsvob();
+        public final String[] vobs;
+        public VobsHolder(String[] vobs) {
+            this.vobs = vobs;
+        }
     }
 
-    private static String[] getAllVobs() {
-        return VobsHolder.vobs;
+    private String[] getAllVobs() {
+        VobsHolder result = vobsHolder;
+        if (result == null) {
+            synchronized(VOBS_HOLDER_LOCK) {
+                result = vobsHolder;
+                if (result == null) {
+                    result = new VobsHolder(runLsvob(env));
+                    vobsHolder = result;
+                }
+            }
+        }
+        return result.vobs;
     }
 
     private static final ClearCaseRepository testRepo
             = new ClearCaseRepository();
 
-    private static String[] runLsvob() {
+    private static String[] runLsvob(RuntimeEnvironment env) {
         if (testRepo.isWorking()) {
             Executor exec = new Executor(
-                    new String[]{testRepo.RepoCommand, "lsvob", "-s"});
+                    new String[]{testRepo.RepoCommand, "lsvob", "-s"},
+                env.getCommandTimeout());
             int rc;
             if ((rc = exec.exec(true)) == 0) {
                 String output = exec.getOutputString();

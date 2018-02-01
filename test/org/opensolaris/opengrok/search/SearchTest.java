@@ -50,6 +50,7 @@ import static org.junit.Assert.assertTrue;
  */
 public class SearchTest {
 
+    static RuntimeEnvironment env;
     static TestRepository repository;
     static boolean skip = false;
     static PrintStream err = System.err;
@@ -57,10 +58,10 @@ public class SearchTest {
 
     @BeforeClass
     public static void setUpClass() throws Exception {
-        repository = new TestRepository();
+        env = RuntimeEnvironment.getInstance();
+        repository = new TestRepository(env);
         repository.create(IndexerTest.class.getResourceAsStream("source.zip"));
 
-        RuntimeEnvironment env = RuntimeEnvironment.getInstance();
         env.setSourceRoot(repository.getSourceRoot());
         env.setDataRoot(repository.getDataRoot());
 
@@ -72,7 +73,7 @@ public class SearchTest {
             Indexer.getInstance().prepareIndexer(env, true, true,
                     new TreeSet<>(Arrays.asList(new String[]{"/c"})),
                     false, false, null, null, new ArrayList<>(), false);
-            Indexer.getInstance().doIndexerExecution(true, null, null);
+            Indexer.getInstance().doIndexerExecution(env, true, null, null);
         } else {
             System.out.println("Skipping test. Could not find a ctags I could use in path.");
             skip = true;
@@ -81,7 +82,7 @@ public class SearchTest {
         configFile = File.createTempFile("configuration", ".xml");
         env.writeConfiguration(configFile);
 
-        RuntimeEnvironment.getInstance().readConfiguration(new File(configFile.getAbsolutePath()));
+        env.readConfiguration(new File(configFile.getAbsolutePath()));
         PrintStream stream = new PrintStream(new ByteArrayOutputStream());
         System.setErr(stream);
     }
@@ -106,7 +107,7 @@ public class SearchTest {
         if (skip) {
             return;
         }
-        Search instance = new Search();
+        Search instance = new Search(env);
 
         assertTrue(instance.parseCmdLine(new String[]{}));
         assertTrue(instance.parseCmdLine(new String[]{"-f", "foo"}));
@@ -143,7 +144,7 @@ public class SearchTest {
             return;
         }
 
-        Search instance = new Search();
+        Search instance = new Search(env);
 
         assertFalse(instance.search());
         assertTrue(instance.parseCmdLine(new String[]{"-p", "Makefile"}));
@@ -198,12 +199,12 @@ public class SearchTest {
         assertTrue(instance.search());
         assertEquals(1, instance.results.size());
 
-        RuntimeEnvironment.getInstance().setAllowLeadingWildcard(true);
+        env.setAllowLeadingWildcard(true);
         assertTrue(instance.parseCmdLine(new String[]{"-p", "?akefile"}));
         assertTrue(instance.search());
         assertEquals(1, instance.results.size());
 
-        RuntimeEnvironment.getInstance().setAllowLeadingWildcard(true);
+        env.setAllowLeadingWildcard(true);
         assertTrue(instance.parseCmdLine(new String[]{"-f", "********in argv path:main.c"}));
         assertTrue(instance.search());
         assertEquals(4, instance.results.size());
@@ -215,7 +216,7 @@ public class SearchTest {
         if (skip) {
             return;
         }
-        Search instance = new Search();
+        Search instance = new Search(env);
 
         assertTrue(instance.parseCmdLine(new String[]{"-p", "path_that_can't_be_found"}));
         assertTrue(instance.search());
@@ -243,7 +244,7 @@ public class SearchTest {
         if (skip) {
             return;
         }
-        Search instance = new Search();
+        Search instance = new Search(env);
         assertTrue(instance.parseCmdLine(new String[]{"-p", "Non-existing-makefile-Makefile"}));
         assertTrue(instance.search());
         assertEquals(0, instance.results.size());
@@ -287,7 +288,7 @@ public class SearchTest {
             return;
         }
         
-        Search instance = new Search();
+        Search instance = new Search(env);
         assertTrue(instance.parseCmdLine(new String[]{"-f", "\"beforelongline\"","-p", "\"testlong.js\""}));
         assertTrue(instance.search());
         assertEquals(1, instance.results.size());
@@ -302,7 +303,7 @@ public class SearchTest {
             return;
         }
         
-        Search instance = new Search();
+        Search instance = new Search(env);
         //if fix for #1170 works, below should be also in index
         assertTrue(instance.parseCmdLine(new String[]{"-f", "\"afterlongline\"","-p", "\"testlong.js\""}));
         assertTrue(instance.search());

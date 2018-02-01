@@ -41,11 +41,15 @@ import org.opensolaris.opengrok.configuration.RuntimeEnvironment;
  */
 public class TestRepository {
 
+    private final RuntimeEnvironment env;
     private File sourceRoot;
     private File dataRoot;
 
+    public TestRepository(RuntimeEnvironment env) {
+        this.env = env;
+    }
+
     public void createEmpty() throws IOException {
-        RuntimeEnvironment env = RuntimeEnvironment.getInstance();
         sourceRoot = FileUtilities.createTemporaryDirectory("source");
         dataRoot = FileUtilities.createTemporaryDirectory("data");
         env.setSourceRoot(sourceRoot.getAbsolutePath());
@@ -68,8 +72,8 @@ public class TestRepository {
             FileUtilities.copyFile(inputBundle, out);
             out.close();
             FileUtilities.extractArchive(sourceBundle, sourceRoot);
-            RuntimeEnvironment.getInstance().setSourceRoot(sourceRoot.getAbsolutePath());
-            RuntimeEnvironment.getInstance().setDataRoot(dataRoot.getAbsolutePath());
+            env.setSourceRoot(sourceRoot.getAbsolutePath());
+            env.setDataRoot(dataRoot.getAbsolutePath());
         } finally {
             if (sourceBundle != null) {
                 sourceBundle.delete();

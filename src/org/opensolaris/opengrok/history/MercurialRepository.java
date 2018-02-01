@@ -19,7 +19,7 @@
 
 /*
  * Copyright (c) 2006, 2017, Oracle and/or its affiliates. All rights reserved.
- * Portions Copyright (c) 2017, Chris Fraire <cfraire@me.com>.
+ * Portions Copyright (c) 2017-2018, Chris Fraire <cfraire@me.com>.
  */
 package org.opensolaris.opengrok.history;
 
@@ -31,7 +31,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.TreeSet;
@@ -39,7 +38,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.opensolaris.opengrok.configuration.RuntimeEnvironment;
 import org.opensolaris.opengrok.logger.LoggerFactory;
 import org.opensolaris.opengrok.util.Executor;
 import org.opensolaris.opengrok.web.Util;
@@ -133,7 +131,8 @@ public class MercurialRepository extends Repository {
         cmd.add(RepoCommand);
         cmd.add("branch");
 
-        Executor executor = new Executor(cmd, new File(getDirectoryName()));
+        Executor executor = new Executor(cmd, new File(getDirectoryName()),
+            env.getCommandTimeout());
         if (executor.exec(false) != 0) {
             throw new IOException(executor.getErrorString());
         }
@@ -154,7 +153,6 @@ public class MercurialRepository extends Repository {
     Executor getHistoryLogExecutor(File file, String sinceRevision)
             throws HistoryException, IOException {
         String filename = getRepoRelativePath(file);
-        RuntimeEnvironment env = RuntimeEnvironment.getInstance();
 
         List<String> cmd = new ArrayList<>();
         ensureCommand(CMD_PROPERTY_KEY, CMD_FALLBACK);
@@ -202,7 +200,8 @@ public class MercurialRepository extends Repository {
             cmd.add(filename);
         }
 
-        return new Executor(cmd, new File(getDirectoryName()), sinceRevision != null);
+        return new Executor(cmd, new File(getDirectoryName()),
+            sinceRevision != null ? env.getCommandTimeout() : 0);
     }
 
     /**
@@ -443,7 +442,7 @@ public class MercurialRepository extends Repository {
         // Construct hash map for history entries from history cache. This is
         // needed later to get user string for particular revision.
         try {
-            History hist = HistoryGuru.getInstance().getHistory(file, false);
+            History hist = env.getHistoryGuru().getHistory(file, false);
             for (HistoryEntry e : hist.getHistoryEntries()) {
                 // Chop out the colon and all hexadecimal what follows.
                 // This is because the whole changeset identification is
@@ -516,7 +515,8 @@ public class MercurialRepository extends Repository {
         ensureCommand(CMD_PROPERTY_KEY, CMD_FALLBACK);
         cmd.add(RepoCommand);
         cmd.add("showconfig");
-        Executor executor = new Executor(cmd, directory);
+        Executor executor = new Executor(cmd, directory,
+            env.getCommandTimeout());
         if (executor.exec() != 0) {
             throw new IOException(executor.getErrorString());
         }
@@ -526,7 +526,7 @@ public class MercurialRepository extends Repository {
             cmd.add(RepoCommand);
             cmd.add("pull");
             cmd.add("-u");
-            executor = new Executor(cmd, directory);
+            executor = new Executor(cmd, directory, env.getCommandTimeout());
             if (executor.exec() != 0) {
                 throw new IOException(executor.getErrorString());
             }
@@ -581,7 +581,6 @@ public class MercurialRepository extends Repository {
     @Override
     History getHistory(File file, String sinceRevision)
             throws HistoryException {
-        RuntimeEnvironment env = RuntimeEnvironment.getInstance();
         // Note that the filtering of revisions based on sinceRevision is done
         // in the history log executor by passing appropriate options to
         // the 'hg' executable.
@@ -589,7 +588,7 @@ public class MercurialRepository extends Repository {
         // for file, the file is renamed and its complete history is fetched
         // so no sinceRevision filter is needed.
         // See findOriginalName() code for more details.
-        History result = new MercurialHistoryParser(this).parse(file,
+        History result = new MercurialHistoryParser(this, env).parse(file,
                 sinceRevision);
         
         // Assign tags to changesets they represent.
@@ -689,7 +688,8 @@ public class MercurialRepository extends Repository {
         cmd.add(RepoCommand);
         cmd.add("paths");
         cmd.add("default");
-        Executor executor = new Executor(cmd, directory);
+        Executor executor = new Executor(cmd, directory,
+            env.getCommandTimeout());
         if (executor.exec(false) != 0) {
             throw new IOException(executor.getErrorString());
         }
@@ -711,7 +711,8 @@ public class MercurialRepository extends Repository {
         cmd.add("--template");
         cmd.add("{date|isodate} {node|short} {author} {desc|strip}");
 
-        Executor executor = new Executor(cmd, directory);
+        Executor executor = new Executor(cmd, directory,
+            env.getCommandTimeout());
         if (executor.exec(false) != 0) {
             throw new IOException(executor.getErrorString());
         }

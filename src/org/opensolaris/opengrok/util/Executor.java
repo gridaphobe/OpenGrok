@@ -19,6 +19,7 @@
 
 /*
  * Copyright (c) 2008, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Portions Copyright (c) 2018, Chris Fraire <cfraire@me.com>.
  */
 
 package org.opensolaris.opengrok.util;
@@ -38,7 +39,6 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.opensolaris.opengrok.configuration.RuntimeEnvironment;
 import org.opensolaris.opengrok.logger.LoggerFactory;
 
 /**
@@ -54,34 +54,24 @@ public class Executor {
     private File workingDirectory;
     private byte[] stdout;
     private byte[] stderr;
-    private int timeout; // in seconds, 0 means no timeout
+    private int timeout; // in milliseconds, 0 means no timeout
 
     /**
      * Create a new instance of the Executor.
      * @param cmd An array containing the command to execute
+     * @param timeoutSeconds a value effective if positive
      */
-    public Executor(String[] cmd) {
-        this(Arrays.asList(cmd));
+    public Executor(String[] cmd, int timeoutSeconds) {
+        this(Arrays.asList(cmd), timeoutSeconds);
     }
 
     /**
      * Create a new instance of the Executor.
      * @param cmdList A list containing the command to execute
+     * @param timeoutSeconds a value effective if positive
      */
-    public Executor(List<String> cmdList) {
-        this(cmdList, null);
-    }
-
-    /**
-     * Create a new instance of the Executor
-     * @param cmdList A list containing the command to execute
-     * @param workingDirectory The directory the process should have as the
-     *                         working directory
-     */
-    public Executor(List<String> cmdList, File workingDirectory) {
-        this.cmdList = cmdList;
-        this.workingDirectory = workingDirectory;
-        this.timeout = RuntimeEnvironment.getInstance().getCommandTimeout() * 1000;
+    public Executor(List<String> cmdList, int timeoutSeconds) {
+        this(cmdList, null, timeoutSeconds);
     }
 
     /**
@@ -89,28 +79,15 @@ public class Executor {
      * @param cmdList A list containing the command to execute
      * @param workingDirectory The directory the process should have as the
      *                         working directory
-     * @param timeout If the command runs longer than the timeout (seconds),
-     *                it will be terminated. If the value is 0, no timer
-     *                will be set up.
+     * @param timeoutSeconds If the command runs longer than the specified
+     * seconds it will be terminated. If the value is 0, no timer will be set
+     * up.
      */
-    public Executor(List<String> cmdList, File workingDirectory, int timeout) {
+    public Executor(List<String> cmdList, File workingDirectory,
+        int timeoutSeconds) {
         this.cmdList = cmdList;
         this.workingDirectory = workingDirectory;
-        this.timeout = timeout * 1000;
-    }
-
-    /**
-     * Create a new instance of the Executor with or without timeout,
-     * @param cmdList A list containing the command to execute
-     * @param workingDirectory The directory the process should have as the
-     *                         working directory
-     * @param UseTimeout terminate the process after default timeout or not
-     */
-    public Executor(List<String> cmdList, File workingDirectory, boolean UseTimeout) {
-        this(cmdList, workingDirectory);
-        if (!UseTimeout) {
-            this.timeout = 0;
-        }
+        this.timeout = timeoutSeconds * 1000;
     }
 
     /**
@@ -200,6 +177,7 @@ public class Executor {
              * make progress instead of hanging the whole indexer.
              */
             if (this.timeout != 0) {
+                int capturedTimeoutS = this.timeout / 1000;
                 // invoking the constructor starts the background thread
                 timer = new Timer();
                 timer.schedule(new TimerTask() {
@@ -207,8 +185,7 @@ public class Executor {
                         LOGGER.log(Level.INFO,
                             "Terminating process of command {0} in directory {1} " +
                             "due to timeout {2} seconds",
-                            new Object[] {cmd_str, dir_str,
-                            RuntimeEnvironment.getInstance().getCommandTimeout()});
+                            new Object[] {cmd_str, dir_str, capturedTimeoutS});
                         proc.destroy();
                     }
                 }, this.timeout);

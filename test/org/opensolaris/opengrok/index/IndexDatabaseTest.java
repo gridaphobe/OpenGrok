@@ -47,18 +47,18 @@ import org.opensolaris.opengrok.util.TestRepository;
  */
 public class IndexDatabaseTest {
 
+    private static RuntimeEnvironment env;
     private static TestRepository repository;
-    private static IndexerParallelizer parallelizer;
 
     public IndexDatabaseTest() {
     }
 
     @BeforeClass
     public static void setUpClass() throws Exception {
-        RuntimeEnvironment env = RuntimeEnvironment.getInstance();
+        env = RuntimeEnvironment.getInstance();
         assertTrue("No ctags available", env.validateExuberantCtags());
 
-        repository = new TestRepository();
+        repository = new TestRepository(env);
         repository.create(
                 HistoryGuru.class.getResourceAsStream("repositories.zip"));
 
@@ -68,8 +68,6 @@ public class IndexDatabaseTest {
         env.setProjectsEnabled(true);
         RepositoryFactory.initializeIgnoredNames(env);
 
-        parallelizer = new IndexerParallelizer(env);
-
         // Note that all tests in this class share the index created below.
         // Ergo, if they need to modify it, this has to be done in such a way
         // so that it does not affect other tests, no matter in which order
@@ -78,17 +76,12 @@ public class IndexDatabaseTest {
         indexer.prepareIndexer(
                 env, true, true, new TreeSet<>(Arrays.asList(new String[]{"/c"})),
                 false, false, null, null, new ArrayList<String>(), false);
-        indexer.doIndexerExecution(true, null, null);
+        indexer.doIndexerExecution(env, true, null, null);
     }
 
     @AfterClass
     public static void tearDownClass() throws Exception {
         repository.destroy();
-
-        if (parallelizer != null) {
-            parallelizer.close();
-            parallelizer = null;
-        }
     }
 
     @Test
@@ -96,7 +89,7 @@ public class IndexDatabaseTest {
         // Test that we can get definitions for one of the files in the
         // repository.
         File f1 = new File(repository.getSourceRoot() + "/git/main.c");
-        Definitions defs1 = IndexDatabase.getDefinitions(f1);
+        Definitions defs1 = IndexDatabase.getDefinitions(env, f1);
         assertNotNull(defs1);
         assertTrue(defs1.hasSymbol("main"));
         assertTrue(defs1.hasSymbol("argv"));
@@ -105,7 +98,7 @@ public class IndexDatabaseTest {
 
         //same for windows delimiters
         f1 = new File(repository.getSourceRoot() + "\\git\\main.c");
-        defs1 = IndexDatabase.getDefinitions(f1);
+        defs1 = IndexDatabase.getDefinitions(env, f1);
         assertNotNull(defs1);
         assertTrue(defs1.hasSymbol("main"));
         assertTrue(defs1.hasSymbol("argv"));
@@ -115,13 +108,11 @@ public class IndexDatabaseTest {
         // Test that we get null back if we request definitions for a file
         // that's not in the repository.
         File f2 = new File(repository.getSourceRoot() + "/git/foobar.d");
-        Definitions defs2 = IndexDatabase.getDefinitions(f2);
+        Definitions defs2 = IndexDatabase.getDefinitions(env, f2);
         assertNull(defs2);
     }
 
     private void checkDataExistence(String fileName, boolean shouldExist) {
-        RuntimeEnvironment env = RuntimeEnvironment.getInstance();
-
         for (String dirName : new String[]{"historycache", IndexDatabase.XREF_DIR}) {
             File dataDir = new File(env.getDataRootFile(), dirName);
             File dataFile = new File(dataDir, fileName + ".gz");
@@ -144,13 +135,12 @@ public class IndexDatabaseTest {
      */
     @Test
     public void testCleanupAfterIndexRemoval() throws Exception {
-        RuntimeEnvironment env = RuntimeEnvironment.getInstance();
         final int origNumFiles;
 
         String projectName = "git";
         String ppath = "/" + projectName;
         Project project = new Project(projectName, ppath);
-        IndexDatabase idb = new IndexDatabase(project);
+        IndexDatabase idb = new IndexDatabase(env, project);
         assertNotNull(idb);
 
         // Note that the file to remove has to be different than the one used
@@ -170,7 +160,7 @@ public class IndexDatabaseTest {
         File file = new File(repository.getSourceRoot(), projectName + File.separator + fileName);
         file.delete();
         Assert.assertFalse("file " + fileName + " not removed", file.exists());
-        idb.update(parallelizer);
+        idb.update();
 
         // Check that the data for the file has been removed.
         checkDataExistence(projectName + File.separator + fileName, false);

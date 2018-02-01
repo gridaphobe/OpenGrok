@@ -67,6 +67,7 @@ import org.xml.sax.InputSource;
  */
 public class JFlexXrefTest {
 
+    private static RuntimeEnvironment env;
     private static Ctags ctags;
     private static TestRepository repository;
 
@@ -79,9 +80,9 @@ public class JFlexXrefTest {
 
     @BeforeClass
     public static void setUpClass() throws Exception {
-        ctags = new Ctags();
-        ctags.setBinary(RuntimeEnvironment.getInstance().getCtags());
-        repository = new TestRepository();
+        env = RuntimeEnvironment.getInstance();
+        ctags = new Ctags(env);
+        repository = new TestRepository(env);
         repository.create(JFlexXrefTest.class.getResourceAsStream(
                 "/org/opensolaris/opengrok/index/source.zip"));
     }
@@ -111,20 +112,31 @@ public class JFlexXrefTest {
                 "line 8 with \u2029 char\n" +
                 "line 9\n";
 
-        bug15890LineCount(new JFlexXref(new CXref(new StringReader(fileContents))));
-        bug15890LineCount(new JFlexXref(new CxxXref(new StringReader(fileContents))));
-        bug15890LineCount(new JFlexXref(new LispXref(new StringReader(fileContents))));
-        bug15890LineCount(new JFlexXref(new JavaXref(new StringReader(fileContents))));
-        bug15890LineCount(new JFlexXref(new ScalaXref(new StringReader(fileContents))));
-        bug15890LineCount(new JFlexXref(new FortranXref(new StringReader(fileContents))));
-        bug15890LineCount(new JFlexXref(new HaskellXref(new StringReader(fileContents))));
-        bug15890LineCount(new JFlexXref(new XMLXref(new StringReader(fileContents))));
-        bug15890LineCount(new JFlexXref(new ShXref(new StringReader(fileContents))));
-        bug15890LineCount(new JFlexXref(new TclXref(new StringReader(fileContents))));
-        bug15890LineCount(new JFlexXref(new SQLXref(new StringReader(fileContents))));
-        bug15890LineCount(new TroffXref(new StringReader(fileContents)));
-        bug15890LineCount(new JFlexXref(new PlainXref(new StringReader(fileContents))));
-        bug15890LineCount(new JFlexXref(new PerlXref(new StringReader(fileContents))));
+        bug15890LineCount(new CXref(new StringReader(fileContents)));
+        bug15890LineCount(new CxxXref(new StringReader(fileContents)));
+        bug15890LineCount(new LispXref(new StringReader(fileContents)));
+        bug15890LineCount(new JavaXref(new StringReader(fileContents)));
+        bug15890LineCount(new ScalaXref(new StringReader(fileContents)));
+        bug15890LineCount(new FortranXref(new StringReader(fileContents)));
+        bug15890LineCount(new HaskellXref(new StringReader(fileContents)));
+        bug15890LineCount(new XMLXref(new StringReader(fileContents)));
+        bug15890LineCount(new ShXref(new StringReader(fileContents)));
+        bug15890LineCount(new TclXref(new StringReader(fileContents)));
+        bug15890LineCount(new SQLXref(new StringReader(fileContents)));
+        bug15890LineCount(new TroffXref(new StringReader(fileContents), env));
+        bug15890LineCount(new PlainXref(new StringReader(fileContents)));
+        bug15890LineCount(new PerlXref(new StringReader(fileContents)));
+    }
+
+    /**
+     * Helper method that checks the line count for
+     * {@link #testBug15890LineCount()}.
+     *
+     * @param xref an instance of the xref class to test
+     */
+    private void bug15890LineCount(ScanningSymbolMatcher matcher)
+            throws Exception {
+        bug15890LineCount(new JFlexXref(matcher, env));
     }
 
     /**
@@ -183,7 +195,7 @@ public class JFlexXrefTest {
         Reader in = new InputStreamReader(new FileInputStream(file), "UTF-8");
 
         JFlexXref xref = new JFlexXref(klass.getConstructor(Reader.class).
-            newInstance(in));
+            newInstance(in), env);
         xref.setDefs(defs);
 
         StringWriter out = new StringWriter();
@@ -232,7 +244,7 @@ public class JFlexXrefTest {
     private void assertXrefLine(Class<? extends JFlexSymbolMatcher> xrefClass,
             String inputLine, String expectedOutput) throws Exception {
         JFlexXref xref = new JFlexXref(xrefClass.getConstructor(Reader.class).
-            newInstance(new StringReader(inputLine)));
+            newInstance(new StringReader(inputLine)), env);
 
         StringWriter output = new StringWriter();
         xref.write(output);
@@ -252,7 +264,7 @@ public class JFlexXrefTest {
         final String ECHO_QUOT_XYZ = "echo \"xyz";
         // Analyze a script with broken syntax (unterminated string literal)
         JFlexXref xref = new JFlexXref(new ShXref(
-            new StringReader(ECHO_QUOT_XYZ)));
+            new StringReader(ECHO_QUOT_XYZ)), env);
         StringWriter out = new StringWriter();
         xref.write(out);
         assertLinesEqual("Unterminated string:\n" + ECHO_QUOT_XYZ,
@@ -315,7 +327,7 @@ public class JFlexXrefTest {
             StringReader in = new StringReader(s[0]);
             StringWriter out = new StringWriter();
             JFlexXref xref = new JFlexXref(klass.getConstructor(Reader.class).
-                newInstance(in));
+                newInstance(in), env);
             xref.write(out);
             assertEquals(FIRST_LINE_PREAMBLE + s[1], out.toString());
         }
@@ -329,7 +341,7 @@ public class JFlexXrefTest {
     public void testCxxXrefTemplateParameters() throws Exception {
         StringReader in = new StringReader("#include <vector>\nclass MyClass;\nstd::vector<MyClass> *v;");
         StringWriter out = new StringWriter();
-        JFlexXref xref = new JFlexXref(new CxxXref(in));
+        JFlexXref xref = new JFlexXref(new CxxXref(in), env);
         xref.write(out);
         assertTrue("Link to search for definition of class not found",
                    out.toString().contains("&lt;<a href=\"/source/s?defs=MyClass\""));
@@ -347,7 +359,7 @@ public class JFlexXrefTest {
         StringReader in = new StringReader(
                 SH_HERE_DOC);
 
-        JFlexXref xref = new JFlexXref(new ShXref(in));
+        JFlexXref xref = new JFlexXref(new ShXref(in), env);
         StringWriter out = new StringWriter();
         xref.write(out);
 
@@ -369,7 +381,7 @@ public class JFlexXrefTest {
     @Test
     public void testEmptyJavaComment() throws IOException {
         StringReader in = new StringReader("/**/\nclass xyz { }\n");
-        JFlexXref xref = new JFlexXref(new JavaXref(in));
+        JFlexXref xref = new JFlexXref(new JavaXref(in), env);
         StringWriter out = new StringWriter();
         xref.write(out);
         // Verify that the comment's <span> block is terminated.
@@ -380,7 +392,7 @@ public class JFlexXrefTest {
     public void bug18586() throws IOException, InterruptedException {
         String filename = repository.getSourceRoot() + "/sql/bug18586.sql";
         Reader in = new InputStreamReader(new FileInputStream(filename), "UTF-8");
-        JFlexXref xref = new JFlexXref(new SQLXref(in));
+        JFlexXref xref = new JFlexXref(new SQLXref(in), env);
         xref.setDefs(ctags.doCtags(filename));
         // The next call used to fail with an ArrayIndexOutOfBoundsException.
         xref.write(new StringWriter());
@@ -393,7 +405,7 @@ public class JFlexXrefTest {
     @Test
     public void unterminatedHeredoc() throws IOException {
         JFlexXref xref = new JFlexXref(new ShXref(new StringReader(
-                "cat << EOF\nunterminated heredoc")));
+                "cat << EOF\nunterminated heredoc")), env);
 
         StringWriter out = new StringWriter();
 
@@ -415,7 +427,7 @@ public class JFlexXrefTest {
     @Test
     public void truncatedUuencodedFile() throws IOException {
         JFlexXref xref = new JFlexXref(new UuencodeXref(
-                new StringReader("begin 644 test.txt\n")));
+                new StringReader("begin 644 test.txt\n")), env);
 
         // Generating the xref used to loop forever.
         StringWriter out = new StringWriter();
@@ -436,7 +448,7 @@ public class JFlexXrefTest {
     @Test
     public void testCsharpXrefVerbatimString() throws IOException {
         StringReader in = new StringReader("test(@\"\\some_windows_path_in_a_string\\\");");
-        JFlexXref xref = new JFlexXref(new CSharpXref(in));
+        JFlexXref xref = new JFlexXref(new CSharpXref(in), env);
         StringWriter out = new StringWriter();
         xref.write(out);
         assertTrue(out.toString().contains("<span class=\"s\">@&quot;\\some_windows_path_in_a_string\\&quot;</span>"));
@@ -448,7 +460,7 @@ public class JFlexXrefTest {
     @Test
     public void testEscapeLink() throws IOException {
         StringReader in = new StringReader("http://www.example.com/?a=b&c=d");
-        JFlexXref xref = new JFlexXref(new PlainXref(in));
+        JFlexXref xref = new JFlexXref(new PlainXref(in), env);
         StringWriter out = new StringWriter();
         xref.write(out);
         assertTrue(out.toString().contains(
@@ -464,7 +476,7 @@ public class JFlexXrefTest {
     public void testJFlexRule() throws Exception {
         StringReader in = new StringReader("\\\" { yybegin(STRING); }");
         // JFlex files are usually analyzed with CAnalyzer.
-        JFlexXref xref = new JFlexXref(new CXref(in));
+        JFlexXref xref = new JFlexXref(new CXref(in), env);
         StringWriter out = new StringWriter();
         xref.write(out);
         // Verify that the xref is well-formed XML. Used to throw
@@ -485,7 +497,7 @@ public class JFlexXrefTest {
                                         "void f(); /* unterminated comment\n",
                                         "const char c = 'x\n")) {
             StringReader in = new StringReader(str);
-            JFlexXref xref = new JFlexXref(new CXref(in));
+            JFlexXref xref = new JFlexXref(new CXref(in), env);
             StringWriter out = new StringWriter();
             xref.write(out);
             // Used to throw SAXParseException.
@@ -509,7 +521,7 @@ public class JFlexXrefTest {
         };
         Document doc = new Document();
         StringWriter out = new StringWriter();
-        JavaClassAnalyzerFactory.DEFAULT_INSTANCE.getAnalyzer().analyze(
+        new JavaClassAnalyzerFactory(env).getAnalyzer().analyze(
             doc, src, out);
         // Used to throw SAXParseException.
         DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(
@@ -522,7 +534,7 @@ public class JFlexXrefTest {
     @Test
     public void testFortranSpecialCharacters() throws Exception {
         JFlexXref xref = new JFlexXref(new FortranXref(
-            new StringReader("<?php?>")));
+            new StringReader("<?php?>")), env);
         StringWriter out = new StringWriter();
         xref.write(out);
         // Used to throw SAXParseException.
