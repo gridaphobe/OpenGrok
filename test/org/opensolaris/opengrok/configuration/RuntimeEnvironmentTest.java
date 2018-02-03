@@ -199,9 +199,6 @@ public class RuntimeEnvironmentTest {
     public void testUrlPrefix() {
         RuntimeEnvironment instance = env;
         assertEquals("/source/s?", instance.getUrlPrefix());
-        String prefix = "/opengrok/s?";
-        instance.setUrlPrefix(prefix);
-        assertEquals(prefix, instance.getUrlPrefix());
     }
 
     @Test
