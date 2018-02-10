@@ -233,9 +233,11 @@ Click <a href="<%= rawPath %>">download <%= basename %></a><%
             }
     } else if (rev.length() != 0) {
         // requesting a revision
+        File xrefFile = null;
         if (cfg.isLatestRevision(rev)) {
-            File xrefFile = cfg.findDataFile();
-            if (xrefFile != null) {
+            xrefFile = cfg.findDataFile();
+        }
+        if (xrefFile != null) {
 %>
 <div id="src" data-navigate-window-enabled="<%= navigateWindowEnabled %>">
     <pre><%
@@ -244,7 +246,6 @@ Click <a href="<%= rawPath %>">download <%= basename %></a><%
                     request.getContextPath());
     %></pre>
 </div><%
-            }
         } else {
             // requesting a previous revision
             AnalyzerGuru guru = cfg.getEnv().getAnalyzerGuru();
