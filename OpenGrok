@@ -132,6 +132,8 @@ Supported Environment Variables for configuring the default setup:
                                   (by default 3 directories from SRC_ROOT)
   - OPENGROK_WEBAPP_CFGADDR     Web app address to send configuration to
                                   (use "none" to avoid sending it to web app)
+  - OPENGROK_WEBAPP_CTAGS       Web app should run ctags when necessary
+                                  on|off (default off) (^)
   - OPENGROK_WPREFIX            Disable wildcard prefix search query support (*)
   - OPENGROK_TAG                Enable parsing of revision tags into the History
                                   view
@@ -446,6 +448,12 @@ ${BZR:+-Dorg.opensolaris.opengrok.history.Bazaar=$BZR} \
     case "$OPENGROK_ALL_NONWHITESPACE" in
         on|true|1) ALL_NONWHITESPACE="--allNonWhitespace on" ;;
         *) ALL_NONWHITESPACE="" ;;
+    esac
+
+    OPENGROK_WEBAPP_CTAGS="${OPENGROK_WEBAPP_CTAGS:-false}"
+    case $OPENGROK_WEBAPP_CTAGS in
+        on|true|1) WEBAPP_CTAGS="--webappCtags on" ;;
+        *) WEBAPP_CTAGS="" ;;
     esac
 }
 
@@ -884,6 +892,7 @@ CommonInvocation()
         ${ALL_NONWHITESPACE}						\
         ${READ_XML_CONF}                                        	\
         ${WEBAPP_CONFIG}						\
+        ${WEBAPP_CTAGS}							\
         ${OPENGROK_PROFILER:+--profiler}				\
         "${@}"
 }
