@@ -463,7 +463,24 @@ public abstract class JFlexSymbolMatcher extends JFlexStateStacker
      */
     protected boolean onFilteredSymbolMatched(String str, int start,
         Set<String> keywords) {
-        return onFilteredSymbolMatched(str, start, keywords, true);
+        return onFilteredSymbolMatched(str, str, start, keywords, true);
+    }
+
+    /**
+     * Calls
+     * {@link #onFilteredSymbolMatched(java.lang.String, int, java.util.Set, boolean)}
+     * with {@code str}, {@code start}, {@code keywords}, and {@code true}.
+     * @param literal the literal representation of the symbol
+     * @param str the text string
+     * @param start the text start position
+     * @param keywords an optional set to search for {@code str} as a member to
+     * indicate a keyword
+     * @return true if the {@code str} was not in {@code keywords} or if
+     * {@code keywords} was null
+     */
+    protected boolean onFilteredSymbolMatched(String literal, String str, int start,
+        Set<String> keywords) {
+        return onFilteredSymbolMatched(literal, str, start, keywords, true);
     }
 
     /**
@@ -483,15 +500,36 @@ public abstract class JFlexSymbolMatcher extends JFlexStateStacker
      */
     protected boolean onFilteredSymbolMatched(String str, int start,
         Set<String> keywords, boolean caseSensitive) {
+        return onFilteredSymbolMatched(str, str, start, keywords, caseSensitive);
+    }
+
+    /**
+     * Raises {@link #onKeywordMatched(java.lang.String, int)} if
+     * {@code keywords} is not null and {@code str} is found as a member (in a
+     * case-sensitive or case-less search per {@code caseSensitive}); otherwise
+     * raises {@link #onSymbolMatched(java.lang.String, int)}.
+     * @param literal the literal representation of the symbol
+     * @param str the text string
+     * @param start the text start position
+     * @param keywords an optional set to search for {@code str} as a member to
+     * indicate a keyword
+     * @param caseSensitive a value indicating if {@code keywords} should be
+     * searched for {@code str} as-is ({@code true}) or if the lower-case
+     * equivalent of {@code str} should be used ({@code false}).
+     * @return true if the {@code str} was not in {@code keywords} or if
+     * {@code keywords} was null
+     */
+    protected boolean onFilteredSymbolMatched(String literal, String str, int start,
+        Set<String> keywords, boolean caseSensitive) {
 
         if (keywords != null) {
-            String check = caseSensitive ? str : str.toLowerCase(Locale.ROOT);
+            String check = caseSensitive ? literal : literal.toLowerCase(Locale.ROOT);
             if (keywords.contains(check)) {
-                onKeywordMatched(str, start);
+                onKeywordMatched(literal, start);
                 return false;
             }
         }
-        onSymbolMatched(str, start);
+        onSymbolMatched(literal, str, start);
         return true;
     }
 

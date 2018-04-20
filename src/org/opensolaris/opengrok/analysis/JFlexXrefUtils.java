@@ -277,7 +277,7 @@ public class JFlexXrefUtils {
 
         String[] strs = new String[1];
         strs[0] = "";
-        String check = caseSensitive ? symbol : symbol.toLowerCase(Locale.ROOT);
+        String check = caseSensitive ? literal : literal.toLowerCase(Locale.ROOT);
         if (isKeyword || (keywords != null && keywords.contains( check ))) {
             // This is a keyword, so we don't create a link.
             out.append("<b>");

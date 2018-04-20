@@ -109,6 +109,7 @@ public class PlainAnalyzer extends TextAnalyzer {
         if (fullpath != null && ctags != null) {
             defs = ctags.doCtags(fullpath);
             if (defs != null && defs.numberOfSymbols() > 0) {
+                defs = normalizeDefinitions(defs);
                 tryAddingDefs(doc, defs, src, fullpath);
                 byte[] tags = defs.serialize();
                 doc.add(new StoredField(QueryBuilder.TAGS, tags));                

@@ -89,7 +89,7 @@ File = [a-zA-Z]{FNameChar}* ".inc"
     String id = yytext();
     // For historical reasons, FortranXref doesn't link identifiers of length=1
     if (id.length() > 1) {
-        onFilteredSymbolMatched(id, yychar, Consts.kwd, false);
+        onFilteredSymbolMatched(id, FortranAnalyzer.NORMALIZE.apply(id), yychar, Consts.kwd, false);
     } else {
         onNonSymbolMatched(id, yychar);
     }

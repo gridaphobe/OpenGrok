@@ -108,6 +108,9 @@ public class FortranXrefTest {
         analyzer.setFoldingEnabled(true);
         WriteXrefArgs wargs = new WriteXrefArgs(
             new InputStreamReader(iss, "UTF-8"), sw);
+        if (defs != null) {
+            defs = analyzer.normalizeDefinitions(defs);
+        }
         wargs.setDefs(defs);
         Xrefer xref = analyzer.writeXref(wargs);
         oss.print(sw.toString());

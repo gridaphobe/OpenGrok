@@ -27,8 +27,11 @@ package org.opensolaris.opengrok.analysis.fortran;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import static org.junit.Assert.assertNotNull;
 import org.junit.Test;
 import static org.opensolaris.opengrok.util.CustomAssertions.assertSymbolStream;
@@ -52,17 +55,23 @@ public class FortranSymbolTokenizerTest {
         assertNotNull("despite samplesymbols.txt as resource,", wdsres);
 
         List<String> expectedSymbols = new ArrayList<>();
+        Map<Integer, SimpleEntry<String, String>> overrides = new HashMap<>();
+        int i = 1;
         try (BufferedReader wdsr = new BufferedReader(new InputStreamReader(
             wdsres, "UTF-8"))) {
             String line;
             while ((line = wdsr.readLine()) != null) {
                 int hasho = line.indexOf('#');
                 if (hasho != -1) line = line.substring(0, hasho);
-                expectedSymbols.add(line.trim());
+                String literal = line.trim();
+                String symbol = FortranAnalyzer.NORMALIZE.apply(literal);
+                expectedSymbols.add(symbol);
+                overrides.put(i, new SimpleEntry(literal, symbol));
+                i++;
             }
         }
 
         assertSymbolStream(FortranSymbolTokenizer.class, fres,
-            expectedSymbols);
+            overrides, expectedSymbols);
     }
 }

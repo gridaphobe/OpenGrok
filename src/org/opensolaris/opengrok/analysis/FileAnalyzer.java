@@ -360,4 +360,8 @@ public class FileAnalyzer extends Analyzer {
                 return new LowerCaseFilter(in);
         }
     }
+
+    public Definitions normalizeDefinitions(Definitions defs) {
+        return defs;
+    }
 }
