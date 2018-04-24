@@ -153,6 +153,10 @@ public class PlainAnalyzer extends TextAnalyzer {
         }
     }
 
+    protected Definitions normalizeDefinitions(Definitions defs) {
+        return defs;
+    }
+
     private void tryAddingDefs(Document doc, Definitions defs, StreamSource src,
         String fullpath) throws IOException {
 

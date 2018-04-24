@@ -23,6 +23,8 @@
 
 package org.opensolaris.opengrok.analysis.fortran;
 
+import java.util.function.Function;
+import java.util.Locale;
 import java.util.regex.Pattern;
 
 /**
@@ -46,6 +48,10 @@ public class FortranUtils {
      */
     public static final Pattern CHARLITERAL_APOS_DELIMITER =
         Pattern.compile("\\'((?<=^.(?!\\'))|(?<=[^\\'].(?!\\'))|(?<=^(\\'\\'){1,3}.(?!\\'))|(?<=[^\\'](\\'\\'){1,3}.(?!\\')))");
+
+    public static final Function<String, String> NORMALIZE = (id) -> {
+        return id.toLowerCase(Locale.ROOT) + "_";
+    };
 
     private FortranUtils() {
     }

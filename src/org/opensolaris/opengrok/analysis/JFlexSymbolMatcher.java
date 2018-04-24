@@ -452,8 +452,8 @@ public abstract class JFlexSymbolMatcher extends JFlexStateStacker
 
     /**
      * Calls
-     * {@link #onFilteredSymbolMatched(java.lang.String, int, java.util.Set, boolean)}
-     * with {@code str}, {@code start}, {@code keywords}, and {@code true}.
+     * {@link #onFilteredSymbolMatched(java.lang.String, java.lang.String, int, java.util.Set, boolean)}
+     * with {@code str}, {@code str}, {@code start}, {@code keywords}, and {@code true}.
      * @param str the text string
      * @param start the text start position
      * @param keywords an optional set to search for {@code str} as a member to
@@ -468,8 +468,8 @@ public abstract class JFlexSymbolMatcher extends JFlexStateStacker
 
     /**
      * Calls
-     * {@link #onFilteredSymbolMatched(java.lang.String, int, java.util.Set, boolean)}
-     * with {@code str}, {@code start}, {@code keywords}, and {@code true}.
+     * {@link #onFilteredSymbolMatched(java.lang.String, java.lang.String, int, java.util.Set, boolean)}
+     * with {@code literal}, {@code str}, {@code start}, {@code keywords}, and {@code true}.
      * @param literal the literal representation of the symbol
      * @param str the text string
      * @param start the text start position

@@ -103,7 +103,7 @@ public class FortranXrefTest {
 
         Writer sw = new StringWriter();
         FortranAnalyzerFactory fac = new FortranAnalyzerFactory(env);
-        FileAnalyzer analyzer = fac.getAnalyzer();
+        FortranAnalyzer analyzer = (FortranAnalyzer) fac.getAnalyzer();
         analyzer.setScopesEnabled(true);
         analyzer.setFoldingEnabled(true);
         WriteXrefArgs wargs = new WriteXrefArgs(

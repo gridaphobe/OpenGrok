@@ -361,7 +361,4 @@ public class FileAnalyzer extends Analyzer {
         }
     }
 
-    public Definitions normalizeDefinitions(Definitions defs) {
-        return defs;
-    }
 }
